@@ -307,7 +307,7 @@ let conversationContext=[];
 let _chosenVoice=null;
 let elKey='';
 let currentAudio=null;
-const EL_VOICE='21m00Tcm4TlvDq8ikWAM'; // Rachel — warm, natural
+const EL_VOICE='EXAVITQu4vr4xnSDxMaL'; // Sarah — warm, natural, free tier
 
 // ── ElevenLabs setup ──────────────────────────────────────────────────────────
 function initElKey(){
@@ -345,7 +345,7 @@ async function speakEl(text){
       headers:{'xi-api-key':elKey,'Content-Type':'application/json'},
       body:JSON.stringify({
         text,
-        model_id:'eleven_turbo_v2',
+        model_id:'eleven_monolingual_v1',
         voice_settings:{stability:0.50,similarity_boost:0.82,style:0.30,use_speaker_boost:true}
       })
     });
