@@ -338,7 +338,40 @@ function setElStatus(ok){
 }
 
 // ── ElevenLabs TTS ────────────────────────────────────────────────────────────
+// Convert numbers/symbols to natural spoken form before sending to ElevenLabs
+function prepareForSpeech(text){
+  return text
+    // Dollar amounts with cents e.g. $478.54 → "478 dollars and 54 cents"
+    .replace(/\$(\d+)\.(\d{2})/g, (_, d, c) => `${numberToWords(parseInt(d))} dollars and ${numberToWords(parseInt(c))} cents`)
+    // Dollar amounts without cents e.g. $943 → "943 dollars"
+    .replace(/\$(\d+)/g, (_, d) => `${numberToWords(parseInt(d))} dollars`)
+    // Dates e.g. April 3, 2026 → already fine but numbers like "3rd" help
+    .replace(/\b(\d+)th\b/g, (_, n) => `${numberToWords(parseInt(n))}th`)
+    .replace(/\b(\d+)st\b/g, (_, n) => `${numberToWords(parseInt(n))}st`)
+    .replace(/\b(\d+)nd\b/g, (_, n) => `${numberToWords(parseInt(n))}nd`)
+    .replace(/\b(\d+)rd\b/g, (_, n) => `${numberToWords(parseInt(n))}rd`)
+    // Phone numbers e.g. 1-888-741-1115 → "1 888 741 1115"
+    .replace(/(\d)-(\d{3})-(\d{3})-(\d{4})/g, '$1 $2 $3 $4')
+    // Plain numbers
+    .replace(/\b(\d+)\b/g, (_, n) => numberToWords(parseInt(n)))
+    // Clean up
+    .replace(/\s+/g, ' ').trim();
+}
+
+function numberToWords(n){
+  if(n===0) return 'zero';
+  const ones=['','one','two','three','four','five','six','seven','eight','nine',
+    'ten','eleven','twelve','thirteen','fourteen','fifteen','sixteen','seventeen','eighteen','nineteen'];
+  const tens=['','','twenty','thirty','forty','fifty','sixty','seventy','eighty','ninety'];
+  if(n<20) return ones[n];
+  if(n<100) return tens[Math.floor(n/10)]+(n%10?'-'+ones[n%10]:'');
+  if(n<1000) return ones[Math.floor(n/100)]+' hundred'+(n%100?' '+numberToWords(n%100):'');
+  if(n<10000) return ones[Math.floor(n/1000)]+' thousand'+(n%1000?' '+numberToWords(n%1000):'');
+  return String(n); // fallback for very large numbers
+}
+
 async function speakEl(text){
+  text = prepareForSpeech(text);
   try{
     // Try turbo first, fall back to standard
     const models = ['eleven_turbo_v2_5', 'eleven_turbo_v2', 'eleven_monolingual_v1', 'eleven_multilingual_v2'];
