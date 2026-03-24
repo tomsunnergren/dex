@@ -340,16 +340,28 @@ function setElStatus(ok){
 // ── ElevenLabs TTS ────────────────────────────────────────────────────────────
 async function speakEl(text){
   try{
-    const res=await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${EL_VOICE}/stream`,{
-      method:'POST',
-      headers:{'xi-api-key':elKey,'Content-Type':'application/json'},
-      body:JSON.stringify({
-        text,
-        model_id:'eleven_monolingual_v1',
-        voice_settings:{stability:0.50,similarity_boost:0.82,style:0.30,use_speaker_boost:true}
-      })
-    });
-    if(!res.ok){ setElStatus(false); elKey=''; localStorage.removeItem('el_key'); return false; }
+    // Try turbo first, fall back to standard
+    const models = ['eleven_turbo_v2_5', 'eleven_turbo_v2', 'eleven_monolingual_v1', 'eleven_multilingual_v2'];
+    let res, lastError;
+    for(const model of models){
+      res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${EL_VOICE}`,{
+        method:'POST',
+        headers:{'xi-api-key':elKey,'Content-Type':'application/json','Accept':'audio/mpeg'},
+        body:JSON.stringify({
+          text,
+          model_id: model,
+          voice_settings:{stability:0.50,similarity_boost:0.82}
+        })
+      });
+      if(res.ok) break;
+      const err = await res.clone().json().catch(()=>({}));
+      lastError = `${res.status}: ${err?.detail?.message||'unknown'}`;
+    }
+    if(!res.ok){
+      document.getElementById('el-status').textContent=`❌ ${lastError}`;
+      document.getElementById('el-status').className='err';
+      return false;
+    }
     const blob=await res.blob();
     const url=URL.createObjectURL(blob);
     currentAudio=new Audio(url);
@@ -358,7 +370,11 @@ async function speakEl(text){
     currentAudio.onerror=()=>{ speaking=false; document.getElementById('pause-btn').style.display='none'; };
     await currentAudio.play();
     return true;
-  }catch{ return false; }
+  }catch(e){
+    document.getElementById('el-status').textContent=`❌ ${e.message}`;
+    document.getElementById('el-status').className='err';
+    return false;
+  }
 }
 
 // ── Browser TTS fallback ──────────────────────────────────────────────────────
