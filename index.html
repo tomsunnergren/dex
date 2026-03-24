@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Direct Express — Dex</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:system-ui,-apple-system,sans-serif;background:#f0f4f0;height:100vh;display:flex;flex-direction:column;font-size:16px;}
+
+/* Setup screen */
+#setup-screen{display:none;position:fixed;inset:0;background:#f0f4f0;z-index:200;flex-direction:column;align-items:center;justify-content:center;padding:24px;}
+#setup-screen.show{display:flex;}
+.setup-card{background:#fff;border-radius:20px;padding:32px 28px;max-width:460px;width:100%;box-shadow:0 8px 40px rgba(0,0,0,.12);text-align:center;}
+.setup-logo{background:#1B6B3A;color:#fff;font-weight:900;font-size:14px;letter-spacing:.5px;padding:5px 14px;border-radius:6px;display:inline-block;margin-bottom:20px;}
+.setup-card h2{font-size:22px;font-weight:800;color:#111;margin-bottom:8px;}
+.setup-card p{color:#6b7280;font-size:15px;line-height:1.6;margin-bottom:20px;}
+.setup-cmd{background:#1a1a2e;color:#22c55e;font-family:monospace;font-size:15px;padding:14px 18px;border-radius:10px;text-align:left;margin-bottom:20px;line-height:1.8;}
+.setup-cmd span{color:#9ca3af;font-size:13px;display:block;margin-bottom:4px;}
+.setup-note{font-size:13px;color:#9ca3af;margin-top:12px;}
+
+/* Header */
+#header{background:#1B6B3A;padding:12px 18px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+.logo-pill{background:#fff;border-radius:5px;padding:3px 10px;font-weight:900;font-size:13px;color:#1B6B3A;letter-spacing:.5px;}
+.hdr-title{color:#fff;font-weight:700;font-size:17px;}
+.hdr-sub{color:rgba(255,255,255,.55);font-size:11px;}
+.hdr-btns{display:flex;gap:8px;}
+.hdr-btn{background:rgba(255,255,255,.18);border:none;border-radius:8px;padding:7px 12px;color:#fff;cursor:pointer;font-size:13px;font-weight:600;border:none;}
+.hdr-btn:hover{background:rgba(255,255,255,.28);}
+
+/* Account bar */
+#acct-bar{background:#145530;padding:7px 18px;display:flex;justify-content:space-between;flex-shrink:0;}
+#acct-bar span{color:rgba(255,255,255,.75);font-size:13px;}
+#bal{color:#86efac;font-weight:700;}
+
+/* Messages */
+#messages{flex:1;overflow-y:auto;padding:14px 14px 6px;max-width:580px;width:100%;margin:0 auto;}
+.msg-row{display:flex;margin-bottom:12px;align-items:flex-end;gap:8px;animation:fadeUp .25s ease;}
+.msg-row.user{justify-content:flex-end;}
+.avatar{width:34px;height:34px;border-radius:50%;background:#1B6B3A;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;}
+.bubble{max-width:78%;padding:13px 16px;font-size:16px;line-height:1.6;box-shadow:0 1px 4px rgba(0,0,0,.08);}
+.bubble.bot{background:#fff;color:#111;border-radius:18px 18px 18px 4px;}
+.bubble.user{background:#1B6B3A;color:#fff;border-radius:18px 18px 4px 18px;}
+.dots-row{display:flex;align-items:flex-end;gap:8px;margin-bottom:12px;}
+.dots{display:flex;gap:5px;padding:14px 18px;background:#fff;border-radius:18px 18px 18px 4px;box-shadow:0 1px 4px rgba(0,0,0,.08);}
+.dot{width:8px;height:8px;border-radius:50%;background:#1B6B3A;animation:bounce 1.2s infinite;}
+.dot:nth-child(2){animation-delay:.2s;}.dot:nth-child(3){animation-delay:.4s;}
+
+/* Follow-up chips */
+.fu-row{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:12px;padding-left:42px;}
+.fu{background:#fff;border:1.5px solid #bbf7d0;border-radius:20px;padding:7px 14px;font-size:14px;color:#166534;cursor:pointer;font-weight:500;transition:background .15s;}
+.fu:hover{background:#f0fdf4;}
+
+/* Info cards */
+.card{border-radius:14px;padding:16px;margin-bottom:14px;border:2px solid;box-shadow:0 2px 8px rgba(0,0,0,.06);animation:fadeUp .25s ease;}
+.crow{display:flex;align-items:flex-start;gap:8px;margin-bottom:7px;font-size:14px;line-height:1.4;}
+
+/* Quick actions */
+#qa{margin-top:4px;}
+#qa p{font-size:13px;color:#9ca3af;margin-bottom:8px;text-align:center;}
+.qbtn{width:100%;text-align:left;padding:13px 16px;margin-bottom:7px;background:#fff;border:1.5px solid #d1fae5;border-radius:12px;cursor:pointer;font-size:16px;color:#166534;font-weight:500;display:flex;align-items:center;justify-content:space-between;box-shadow:0 1px 3px rgba(0,0,0,.05);transition:background .15s;}
+.qbtn:hover{background:#f0fdf4;}
+
+/* Banners */
+#listen-bar{background:#ecfdf5;border-top:1px solid #a7f3d0;padding:10px 16px;text-align:center;max-width:580px;width:100%;margin:0 auto;display:none;flex-shrink:0;}
+#listen-bar span{color:#065f46;font-size:15px;}
+#err-bar{background:#fff7ed;border-top:1px solid #fed7aa;padding:9px 16px;text-align:center;color:#9a3412;font-size:14px;max-width:580px;width:100%;margin:0 auto;display:none;flex-shrink:0;}
+
+/* Input */
+#input-area{background:#fff;border-top:1px solid #e5e7eb;padding:11px 14px;max-width:580px;width:100%;margin:0 auto;flex-shrink:0;}
+#mic-btn{width:100%;padding:17px;border-radius:14px;border:none;background:#1B6B3A;color:#fff;font-size:19px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:8px;transition:background .2s;}
+#mic-btn.on{background:#dc2626;animation:pulse 1.5s infinite;}
+#pause-btn{width:100%;margin-bottom:8px;padding:9px;border-radius:10px;border:2px solid #1B6B3A;background:transparent;color:#1B6B3A;cursor:pointer;font-size:14px;font-weight:600;display:none;align-items:center;justify-content:center;gap:6px;}
+#trow{display:flex;gap:7px;}
+#txt{flex:1;padding:11px 14px;border-radius:10px;border:1.5px solid #d1d5db;font-size:16px;outline:none;color:#111;}
+#txt:focus{border-color:#1B6B3A;}
+#send{padding:11px 18px;border-radius:10px;background:#9ca3af;border:none;color:#fff;cursor:default;font-weight:700;font-size:15px;transition:background .2s;}
+#send.on{background:#1B6B3A;cursor:pointer;}
+
+/* Footer */
+#footer{background:#f9fafb;border-top:1px solid #e5e7eb;padding:8px 16px;text-align:center;font-size:13px;color:#6b7280;flex-shrink:0;}
+#footer strong{color:#1B6B3A;}
+
+body.lg{font-size:19px;}
+body.lg .bubble{font-size:19px;}
+body.lg .qbtn{font-size:19px;}
+body.lg #mic-btn{font-size:22px;}
+
+@keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.75}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:translateY(0)}}
+</style>
+</head>
+<body>
+
+<!-- Setup screen: shown only when running from file:// -->
+<div id="setup-screen">
+  <div class="setup-card">
+    <div class="setup-logo">DIRECT EXPRESS®</div>
+    <h2>One quick step to enable voice</h2>
+    <p>Chrome blocks microphone access when opening HTML files directly. Run this one command in Terminal to launch properly:</p>
+    <div class="setup-cmd">
+      <span># Paste this into Terminal and press Enter:</span>
+      cd ~/Downloads && python3 -m http.server 8080
+    </div>
+    <p>Then open Chrome and go to:<br/>
+    <strong style="color:#1B6B3A;font-size:16px;">http://localhost:8080/direct-express-assistant.html</strong></p>
+    <p class="setup-note">This only needs to be done once per session. The Terminal window must stay open while demoing.</p>
+  </div>
+</div>
+
+<!-- Header -->
+<div id="header">
+  <div style="display:flex;align-items:center;gap:12px">
+    <div class="logo-pill">DIRECT EXPRESS®</div>
+    <div>
+      <div class="hdr-title">Dex — Virtual Assistant</div>
+      <div class="hdr-sub">Available 24/7</div>
+    </div>
+  </div>
+  <div class="hdr-btns">
+    <button class="hdr-btn" onclick="toggleLarge()" id="lt-btn">🔠 Large Text</button>
+    <button class="hdr-btn" onclick="toggleVoice()" id="vt-btn">🔊 Voice On</button>
+  </div>
+</div>
+
+<!-- Account bar -->
+<div id="acct-bar">
+  <span>Hi, <strong style="color:#fff">Maggie</strong> &nbsp;·&nbsp; Card ••••&nbsp;4823</span>
+  <span id="bal">$612.47 available</span>
+</div>
+
+<!-- Messages -->
+<div id="messages">
+  <div id="card-area"></div>
+  <div id="chat"></div>
+  <div id="qa">
+    <p>Common questions — tap to get started</p>
+    <button class="qbtn" onclick="qs('What is my balance and recent transactions?')">💰 Balance &amp; transactions <span>›</span></button>
+    <button class="qbtn" onclick="qs('I lost my card.')">🃏 I lost my card <span>›</span></button>
+    <button class="qbtn" onclick="qs('There is a charge I do not recognize.')">❓ Dispute a charge <span>›</span></button>
+    <button class="qbtn" onclick="qs('When is my next Social Security deposit?')">📅 When is my deposit? <span>›</span></button>
+    <button class="qbtn" onclick="qs('I need to reset my PIN.')">🔒 Reset my PIN <span>›</span></button>
+    <button class="qbtn" onclick="qs('What fees does my card charge?')">💳 Card fees <span>›</span></button>
+  </div>
+  <div id="anchor"></div>
+</div>
+
+<div id="listen-bar"><span id="listen-txt">🎙️ Listening — speak now...</span></div>
+<div id="err-bar"></div>
+
+<!-- Input -->
+<div id="input-area">
+  <button id="mic-btn" onclick="toggleMic()">🎙️ Tap to Speak</button>
+  <button id="pause-btn" onclick="stopSpeak()">⏸ Pause speaking</button>
+  <div id="trow">
+    <input id="txt" type="text" placeholder="Or type your question here..." oninput="onTxtInput()" onkeydown="onTxtKey(event)"/>
+    <button id="send" onclick="sendTxt()">Send</button>
+  </div>
+</div>
+<div id="footer">📞 Need more help? Call <strong>1-888-741-1115</strong> — available 24/7</div>
+
+<script>
+// ── Account data (realistic, fabricated) ─────────────────────────────────────
+const ACCT = {
+  name: "Maggie",
+  card: "4823",
+  balance: 612.47,
+  nextDeposit: { amount: 967.00, date: "April 3, 2026", day: "Friday", source: "Social Security" },
+  transactions: [
+    {date:"Mar 23",merchant:"Walgreens",amt:-18.43},
+    {date:"Mar 22",merchant:"Kroger",amt:-54.81},
+    {date:"Mar 21",merchant:"National Grid",amt:-72.50},
+    {date:"Mar 20",merchant:"CVS Pharmacy",amt:-11.29},
+    {date:"Mar 19",merchant:"McDonald's",amt:-9.17},
+    {date:"Mar 15",merchant:"Social Security Deposit",amt:+967.00},
+    {date:"Mar 12",merchant:"Rite Aid",amt:-22.64},
+    {date:"Mar 10",merchant:"Dollar General",amt:-14.38},
+  ]
+};
+
+// ── Scripted responses ────────────────────────────────────────────────────────
+// Each entry: { match: regex, card: string|null, reply: string, followups: string[] }
+const SCRIPTS = [
+  {
+    match: /balance|how much|available|funds|money.*(card|account)/i,
+    card: 'balance',
+    reply: `Your current balance is $612.47, Maggie. That's what's available on your Direct Express card right now. Is there anything else I can help you with?`,
+    followups: ["Show my recent transactions", "When is my next deposit?", "What are my card fees?"]
+  },
+  {
+    match: /transaction|history|recent|spent|purchase|statement|charges/i,
+    card: 'txns',
+    reply: `Here are your most recent transactions. Your last purchase was $18.43 at Walgreens on March 23rd. Your Social Security deposit of $967.00 came in on March 15th. Is there anything else I can help you with?`,
+    followups: ["What is my balance?", "I don't recognize one of these charges", "When is my next deposit?"]
+  },
+  {
+    match: /lost|stolen|missing.*card|can't find.*card|someone.*used|unauthorized|fraud|lock.*card/i,
+    card: 'locked',
+    reply: `I'm sorry to hear that, Maggie. I've locked your card ending in 4823 right now, so no new charges can go through. A replacement card will be mailed to your address and should arrive in 5 to 7 business days. You'll get a text message when it ships. Is there anything else I can help you with?`,
+    followups: ["Will I still get my deposit?", "How do I activate the new card?", "What if I find my old card?"]
+  },
+  {
+    match: /dispute|don't recognize|didn't make|wrong charge|suspicious|unauthorized charge|unusual/i,
+    card: 'dispute',
+    reply: `I understand — that can be concerning. I've flagged this for our disputes team and opened a case for you. We'll investigate within 10 business days. In many cases, a provisional credit is issued to your card within 5 business days while we look into it. We'll contact you by text once we have an update. Is there anything else I can help you with?`,
+    followups: ["Which transaction should I dispute?", "How long does a dispute take?", "Can I see my recent transactions?"]
+  },
+  {
+    match: /deposit|payment|social security|ssa|benefit.*arrive|when.*money|direct deposit/i,
+    card: 'deposit',
+    reply: `Your next Social Security deposit of $967.00 is scheduled for Friday, April 3rd. That's 10 days from now. It will be on your card first thing that morning. Is there anything else I can help you with?`,
+    followups: ["What is my current balance?", "What if my deposit doesn't arrive?", "Show my recent transactions"]
+  },
+  {
+    match: /deposit.*not.*arrive|missing.*deposit|didn't.*receive|where.*deposit|deposit.*late/i,
+    card: 'deposit',
+    reply: `I'm sorry your deposit hasn't shown up yet, Maggie. Most Social Security payments arrive by 9 AM on the scheduled date, but occasionally they can take until the end of the business day. If it still hasn't arrived by tomorrow morning, please call us at 1-888-741-1115 and we can look into it right away. Is there anything else I can help you with?`,
+    followups: ["What is my balance?", "When was my last deposit?", "Call Direct Express"]
+  },
+  {
+    match: /pin|password|forgot.*pin|change.*pin|reset.*pin/i,
+    card: 'pin',
+    reply: `No problem, Maggie. Resetting your PIN is quick and easy. Just call 1-888-741-1115, then press 2 for PIN services. The automated system will walk you through it — it only takes about 2 minutes. Your new PIN will work right away. Is there anything else I can help you with?`,
+    followups: ["What if I can't remember my old PIN?", "Is there a fee to reset my PIN?", "What else can you help with?"]
+  },
+  {
+    match: /fee|fees|cost|how much.*charge|charges.*card|what.*cost/i,
+    card: 'fees',
+    reply: `Good news — most things on your Direct Express card are free. Purchases at any store are always free. Your first ATM cash withdrawal each month is also free. After that, it's 85 cents per ATM withdrawal. Is there anything else I can help you with?`,
+    followups: ["What is my current balance?", "How do I find a free ATM?", "When is my next deposit?"]
+  },
+  {
+    match: /activate|new card|activate.*card|card.*activate/i,
+    card: null,
+    reply: `To activate your new card, just call 1-888-741-1115. Have your new card ready along with the last four digits of your Social Security number. Activation takes just a couple of minutes, and your card will be ready to use right away. Is there anything else I can help you with?`,
+    followups: ["How do I set my PIN?", "What is my balance?", "Can I use the card right after activating?"]
+  },
+  {
+    match: /address|change.*address|update.*address|move|new address/i,
+    card: null,
+    reply: `To update your address, please call us at 1-888-741-1115. Have your card and the last four digits of your Social Security number handy. It only takes a few minutes and your account will be updated right away. Is there anything else I can help you with?`,
+    followups: ["Will my next deposit still arrive?", "What else can you help with?", "What is my balance?"]
+  },
+  {
+    match: /atm|cash|withdraw/i,
+    card: null,
+    reply: `You can use your Direct Express card at any ATM. Your first cash withdrawal each deposit cycle is free. After that, it's 85 cents per withdrawal at in-network ATMs, or $3.00 at out-of-network ATMs. To find a free ATM near you, look for Allpoint or MoneyPass ATMs — there are thousands of locations nationwide. Is there anything else I can help you with?`,
+    followups: ["What is my current balance?", "What are all my card fees?", "When is my next deposit?"]
+  },
+  {
+    match: /interest|earn|savings/i,
+    card: null,
+    reply: `Your Direct Express card is a prepaid debit card, so it doesn't earn interest. But it also means there's no risk of overdraft or debt — you can only spend what's on the card. Is there anything else I can help you with?`,
+    followups: ["What is my balance?", "What fees does my card have?", "When is my next deposit?"]
+  },
+  {
+    match: /speak|agent|representative|human|real person|call|talk.*someone/i,
+    card: null,
+    reply: `Of course, Maggie. You can reach a Direct Express representative any time by calling 1-888-741-1115. They're available 24 hours a day, 7 days a week. Is there anything else I can help you with before you call?`,
+    followups: ["What is my balance?", "Show my recent transactions", "When is my next deposit?"]
+  },
+  {
+    match: /thank|thanks|thank you|that helps|helpful/i,
+    card: null,
+    reply: `You're very welcome, Maggie! It's my pleasure to help. Is there anything else I can help you with today?`,
+    followups: ["Check my balance", "Show my recent transactions", "When is my next deposit?"]
+  },
+  {
+    match: /hi|hello|hey|good morning|good afternoon|good evening/i,
+    card: null,
+    reply: `Hello again, Maggie! It's good to hear from you. What can I help you with today?`,
+    followups: ["Check my balance", "I lost my card", "When is my next deposit?"]
+  }
+];
+
+const DEFAULT = {
+  reply: `I want to make sure I get you the right help. Could you tell me a little more about what you need? I can help with your balance, transactions, a lost card, disputes, deposits, your PIN, or card fees. Is there anything else I can clarify?`,
+  followups: ["Check my balance", "I lost my card", "Dispute a charge", "When is my next deposit?"]
+};
+
+// ── State ─────────────────────────────────────────────────────────────────────
+let voiceOn=true, speaking=false, listening=false;
+let rec=null, micStream=null, pending='', lgText=false;
+let conversationContext = [];
+let _chosenVoice = null;
+
+// Pre-load and pick the best available voice once
+function pickVoice(){
+  if(_chosenVoice) return _chosenVoice;
+  const vv = window.speechSynthesis.getVoices();
+  // Priority order: enhanced/neural first, then standard fallbacks
+  const priority = [
+    'Samantha (Enhanced)',       // Mac — best natural female
+    'Karen (Enhanced)',          // Mac AU — warm
+    'Moira (Enhanced)',          // Mac IE — clear
+    'Microsoft Aria Online',     // Windows neural — very natural
+    'Microsoft Jenny Online',    // Windows neural
+    'Google US English',         // Chrome built-in — decent
+    'Samantha',                  // Mac standard
+    'Karen',
+    'Moira',
+    'Microsoft Aria',
+    'Microsoft Zira',
+  ];
+  for(const name of priority){
+    const v = vv.find(v=>v.name===name);
+    if(v){ _chosenVoice=v; return v; }
+  }
+  // Last resort: any en-US local voice
+  return vv.find(v=>v.lang==='en-US'&&v.localService) || vv.find(v=>v.lang==='en-US') || null;
+}
+
+// ── TTS ───────────────────────────────────────────────────────────────────────
+function speak(text){
+  if(!voiceOn||!window.speechSynthesis) return;
+  window.speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  // Warm, unhurried, natural cadence
+  u.rate  = 0.78;
+  u.pitch = 1.05;
+  u.volume = 1.0;
+  const doSpeak = ()=>{
+    const v = pickVoice();
+    if(v) u.voice = v;
+    u.onstart = ()=>{ speaking=true;  document.getElementById('pause-btn').style.display='flex'; };
+    u.onend   = ()=>{ speaking=false; document.getElementById('pause-btn').style.display='none'; };
+    u.onerror = ()=>{ speaking=false; document.getElementById('pause-btn').style.display='none'; };
+    window.speechSynthesis.speak(u);
+  };
+  // Voices may not be loaded yet on first call
+  if(window.speechSynthesis.getVoices().length){
+    doSpeak();
+  } else {
+    window.speechSynthesis.onvoiceschanged = ()=>{ window.speechSynthesis.onvoiceschanged=null; doSpeak(); };
+  }
+}
+
+function stopSpeak(){
+  window.speechSynthesis?.cancel();
+  speaking=false;
+  document.getElementById('pause-btn').style.display='none';
+}
+
+function saveElKey(){} // no-op, kept to avoid errors
+window.addEventListener('load', ()=>{
+  // Show setup screen if on file://
+  if(location.protocol === 'file:'){
+    document.getElementById('setup-screen').classList.add('show');
+    return;
+  }
+  initSpeech();
+  const w = `Hi Maggie! I'm Dex, your Direct Express assistant. I'm here to help you 24 hours a day, 7 days a week. You can speak to me or type your question. What can I help you with today?`;
+  addMsg('bot', w);
+  setTimeout(()=>speak(w), 500);
+});
+
+// ── Speech Recognition ────────────────────────────────────────────────────────
+function initSpeech(){
+  if(!('SpeechRecognition' in window||'webkitSpeechRecognition' in window)){
+    document.getElementById('mic-btn').textContent = 'Voice not supported — please use Chrome';
+    document.getElementById('mic-btn').disabled = true;
+    return;
+  }
+  navigator.mediaDevices.getUserMedia({audio:true})
+    .then(s=>{ micStream=s; })
+    .catch(()=>showErr('Microphone access denied. Click the 🔒 icon in the address bar and allow microphone access.'));
+
+  const SR = window.SpeechRecognition||window.webkitSpeechRecognition;
+  rec = new SR();
+  rec.continuous = false;
+  rec.interimResults = true;
+  rec.lang = 'en-US';
+
+  rec.onresult = e=>{
+    let interim='', final='';
+    for(let i=e.resultIndex;i<e.results.length;i++){
+      const t=e.results[i][0].transcript;
+      if(e.results[i].isFinal) final+=t; else interim+=t;
+    }
+    if(final) pending+=final;
+    document.getElementById('listen-txt').textContent = interim ? `"${interim}"` : '🎙️ Listening — speak now...';
+  };
+
+  rec.onerror = e=>{
+    setListening(false);
+    const msgs = {
+      'no-speech': "I didn't hear anything. Please tap the button and try again.",
+      'not-allowed': "Microphone blocked. Click the 🔒 in the address bar to allow it.",
+      'audio-capture': "No microphone found. Please check your microphone is connected.",
+    };
+    showErr(msgs[e.error]||`Couldn't hear you clearly. Please try again.`);
+  };
+
+  rec.onend = ()=>{
+    setListening(false);
+    if(pending.trim()){ const t=pending.trim(); pending=''; send(t); }
+  };
+}
+
+function toggleMic(){
+  if(!rec) return;
+  if(listening){ rec.stop(); setListening(false); return; }
+  stopSpeak(); pending=''; hideErr();
+  try{ rec.start(); setListening(true); }
+  catch{ setTimeout(()=>{ rec.start(); setListening(true); }, 300); }
+}
+
+function setListening(v){
+  listening=v;
+  const btn=document.getElementById('mic-btn');
+  const bar=document.getElementById('listen-bar');
+  if(v){
+    btn.innerHTML='🛑&nbsp; Tap when done speaking';
+    btn.classList.add('on'); bar.style.display='block';
+  } else {
+    btn.innerHTML='🎙️&nbsp; Tap to Speak';
+    btn.classList.remove('on'); bar.style.display='none';
+    document.getElementById('listen-txt').textContent='🎙️ Listening — speak now...';
+  }
+}
+
+// ── TTS ───────────────────────────────────────────────────────────────────────
+function toggleVoice(){
+  voiceOn=!voiceOn;
+  if(!voiceOn) stopSpeak();
+  document.getElementById('vt-btn').textContent = voiceOn ? '🔊 Voice On' : '🔇 Voice Off';
+}
+
+// ── Response engine ───────────────────────────────────────────────────────────
+function getResponse(text){
+  for(const s of SCRIPTS){
+    if(s.match.test(text)) return s;
+  }
+  // Fuzzy fallback — check last context
+  if(conversationContext.includes('dispute') && /yes|correct|that one|it was|the|amazon|kroger|walgreens|cvs|mcdonald/i.test(text)){
+    return SCRIPTS.find(s=>s.card==='dispute');
+  }
+  if(conversationContext.includes('lost') && /yes|please|sure|ok/i.test(text)){
+    return SCRIPTS.find(s=>s.card==='locked');
+  }
+  return DEFAULT;
+}
+
+// ── Send message ──────────────────────────────────────────────────────────────
+function send(text){
+  if(!text.trim()) return;
+  hideErr();
+  document.getElementById('qa').style.display='none';
+  addMsg('user', text);
+  detectIntent(text);
+
+  // Simulate thinking delay
+  showTyping();
+  const resp = getResponse(text);
+  if(resp.card) conversationContext.push(resp.card);
+
+  setTimeout(()=>{
+    hideTyping();
+    addMsg('bot', resp.reply);
+    if(resp.followups && resp.followups.length) showFU(resp.followups);
+    speak(resp.reply);
+  }, 900 + Math.random()*400);
+}
+
+function qs(t){ send(t); }
+function sendTxt(){ const v=document.getElementById('txt').value.trim(); if(!v)return; document.getElementById('txt').value=''; updSend(); send(v); }
+function onTxtInput(){ updSend(); }
+function onTxtKey(e){ if(e.key==='Enter') sendTxt(); }
+function updSend(){ document.getElementById('send').className = document.getElementById('txt').value.trim() ? 'on' : ''; }
+
+// ── Follow-up chips ───────────────────────────────────────────────────────────
+function showFU(chips){
+  const area=document.getElementById('chat');
+  const row=document.createElement('div'); row.className='fu-row';
+  chips.forEach(c=>{
+    const b=document.createElement('button'); b.className='fu'; b.textContent=c;
+    b.onclick=()=>{ row.remove(); send(c); };
+    row.appendChild(b);
+  });
+  area.appendChild(row); scroll();
+}
+
+// ── Info cards ────────────────────────────────────────────────────────────────
+function detectIntent(t){
+  t=t.toLowerCase();
+  if(/lost|stolen|lock/i.test(t)) return showCard('locked');
+  if(/dispute|don't recognize|didn't make|wrong charge|suspicious|unusual/i.test(t)) return showCard('dispute');
+  if(/balance|how much.*available/i.test(t)) return showCard('balance');
+  if(/transaction|history|spent|recent/i.test(t)) return showCard('txns');
+  if(/deposit|social security|when.*money|next.*payment/i.test(t)) return showCard('deposit');
+  if(/pin|reset.*pin/i.test(t)) return showCard('pin');
+  if(/fee|fees/i.test(t)) return showCard('fees');
+}
+
+function showCard(type){
+  const a=document.getElementById('card-area');
+  const txRows=ACCT.transactions.map(t=>`
+    <div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid #f3f4f6;font-size:14px">
+      <div><div style="font-weight:600">${t.merchant}</div><div style="font-size:12px;color:#9ca3af">${t.date}</div></div>
+      <span style="font-weight:700;color:${t.amt>0?'#16a34a':'#374151'}">${t.amt>0?'+':''}$${Math.abs(t.amt).toFixed(2)}</span>
+    </div>`).join('');
+
+  const C={
+    balance:`<div class="card" style="background:#f0fdf4;border-color:#bbf7d0">
+      <div style="font-size:13px;font-weight:700;color:#166534;margin-bottom:6px">💳 Direct Express •••• 4823</div>
+      <div style="font-size:38px;font-weight:800;color:#14532d;line-height:1">$612.47</div>
+      <div style="color:#166534;font-size:13px;margin-top:4px">Available Balance</div>
+      <div style="margin-top:10px;padding-top:10px;border-top:1px solid #bbf7d0;font-size:13px;color:#166534">🕐 Next deposit: <strong>$967.00</strong> · April 3, 2026</div>
+    </div>`,
+    txns:`<div class="card" style="background:#fff;border-color:#e5e7eb">
+      <div style="font-weight:700;color:#374151;margin-bottom:10px">📋 Recent Transactions</div>${txRows}
+    </div>`,
+    locked:`<div class="card" style="background:#fffbeb;border-color:#fde68a">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+        <div style="width:42px;height:42px;border-radius:50%;background:#fef3c7;display:flex;align-items:center;justify-content:center;font-size:22px">🛡️</div>
+        <div><div style="font-weight:700;color:#92400e;font-size:15px">Card Locked — You're Protected</div><div style="font-size:12px;color:#b45309">Card ending 4823</div></div>
+      </div>
+      ${['Card locked — no new charges possible','Replacement card being mailed to you','Arrives in 5–7 business days','You will receive a text when it ships'].map(s=>`<div class="crow">✅ <span style="color:#78350f">${s}</span></div>`).join('')}
+    </div>`,
+    dispute:`<div class="card" style="background:#eff6ff;border-color:#bfdbfe">
+      <div style="font-weight:700;color:#1e40af;font-size:15px;margin-bottom:10px">⚠️ Dispute Opened</div>
+      ${[['✅','Dispute recorded and assigned a case number'],['🕐','Investigation: up to 10 business days'],['💵','Provisional credit may be issued within 5 days'],['📱','We will text you with updates']].map(r=>`<div class="crow">${r[0]} <span style="font-size:14px;color:#1e3a8a">${r[1]}</span></div>`).join('')}
+    </div>`,
+    deposit:`<div class="card" style="background:#f5f3ff;border-color:#ddd6fe">
+      <div style="font-weight:700;color:#6d28d9;margin-bottom:8px">🔄 Next Deposit</div>
+      <div style="font-size:34px;font-weight:800;color:#4c1d95">$967.00</div>
+      <div style="font-size:13px;color:#6d28d9;margin-top:3px">Social Security</div>
+      <div style="margin-top:8px;font-size:13px;color:#5b21b6">🕐 Arriving <strong>Friday, April 3, 2026</strong></div>
+    </div>`,
+    pin:`<div class="card" style="background:#fdf4ff;border-color:#e9d5ff">
+      <div style="font-weight:700;color:#6b21a8;margin-bottom:12px">🔒 Reset Your PIN</div>
+      ${['Call 1-888-741-1115','Press 2 for PIN services','Follow the voice prompts (about 2 minutes)','New PIN works immediately'].map((s,i)=>`<div class="crow"><span style="width:24px;height:24px;border-radius:50%;background:#e9d5ff;display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;color:#7e22ce;flex-shrink:0">${i+1}</span><span style="font-size:14px;color:#581c87">${s}</span></div>`).join('')}
+    </div>`,
+    fees:`<div class="card" style="background:#fff7ed;border-color:#fed7aa">
+      <div style="font-weight:700;color:#c2410c;margin-bottom:10px">💳 Your Card Fees</div>
+      ${[['Purchases anywhere','Free — always'],['1st ATM withdrawal / month','Free'],['Additional ATM withdrawals','$0.85 each'],['Cash at a bank counter','$1.50'],['Out-of-network ATM','$3.00'],['Balance check at register','Free'],['Monthly maintenance fee','$0 — no monthly fee']].map(r=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid #fed7aa;font-size:14px"><span style="color:#7c2d12">${r[0]}</span><strong style="color:#c2410c">${r[1]}</strong></div>`).join('')}
+    </div>`
+  };
+  if(C[type]) a.innerHTML=C[type];
+}
+
+// ── Chat helpers ──────────────────────────────────────────────────────────────
+function addMsg(role,text){
+  const a=document.getElementById('chat');
+  const row=document.createElement('div'); row.className=`msg-row ${role}`;
+  if(role==='bot') row.innerHTML=`<div class="avatar">🛡</div><div class="bubble bot">${esc(text)}</div>`;
+  else row.innerHTML=`<div class="bubble user">${esc(text)}</div>`;
+  a.appendChild(row); scroll();
+}
+function showTyping(){
+  const a=document.getElementById('chat');
+  const row=document.createElement('div'); row.className='dots-row'; row.id='typing';
+  row.innerHTML=`<div class="avatar">🛡</div><div class="dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>`;
+  a.appendChild(row); scroll();
+}
+function hideTyping(){ document.getElementById('typing')?.remove(); }
+function scroll(){ setTimeout(()=>document.getElementById('anchor').scrollIntoView({behavior:'smooth'}),60); }
+function esc(t){ return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function showErr(m){ const e=document.getElementById('err-bar'); e.textContent=m; e.style.display='block'; }
+function hideErr(){ document.getElementById('err-bar').style.display='none'; }
+function toggleLarge(){ lgText=!lgText; document.body.classList.toggle('lg',lgText); document.getElementById('lt-btn').textContent=lgText?'🔡 Normal Text':'🔠 Large Text'; }
+</script>
+</body>
+</html>
