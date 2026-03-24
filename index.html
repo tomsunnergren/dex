@@ -8,6 +8,18 @@
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:system-ui,-apple-system,sans-serif;background:#f0f4f0;height:100vh;display:flex;flex-direction:column;font-size:16px;}
 
+/* ElevenLabs bar */
+#el-bar{background:#0f172a;padding:10px 18px;display:flex;align-items:center;gap:10px;flex-shrink:0;font-size:13px;}
+#el-bar span{color:rgba(255,255,255,.55);white-space:nowrap;}
+#el-input{flex:1;max-width:300px;padding:7px 12px;border-radius:7px;border:none;font-size:13px;background:#1e293b;color:#fff;outline:none;}
+#el-input::placeholder{color:#475569;}
+#el-save{padding:7px 14px;border-radius:7px;background:#6366f1;border:none;color:#fff;font-weight:700;cursor:pointer;font-size:13px;white-space:nowrap;}
+#el-status{font-size:12px;white-space:nowrap;color:#94a3b8;}
+#el-status.ok{color:#22c55e;}
+#el-status.err{color:#f87171;}
+#el-link{color:#818cf8;font-size:12px;text-decoration:none;white-space:nowrap;}
+#el-link:hover{text-decoration:underline;}
+
 /* Setup screen */
 #setup-screen{display:none;position:fixed;inset:0;background:#f0f4f0;z-index:200;flex-direction:column;align-items:center;justify-content:center;padding:24px;}
 #setup-screen.show{display:flex;}
@@ -107,6 +119,15 @@ body.lg #mic-btn{font-size:22px;}
     <strong style="color:#1B6B3A;font-size:16px;">http://localhost:8080/direct-express-assistant.html</strong></p>
     <p class="setup-note">This only needs to be done once per session. The Terminal window must stay open while demoing.</p>
   </div>
+</div>
+
+<!-- ElevenLabs bar -->
+<div id="el-bar">
+  <span>🎙️ Natural voice:</span>
+  <input id="el-input" type="password" placeholder="Paste free ElevenLabs API key here..."/>
+  <button id="el-save" onclick="saveElKey()">Save</button>
+  <span id="el-status">Using browser voice — sounds robotic</span>
+  <a id="el-link" href="https://elevenlabs.io/app/sign-up" target="_blank">→ Get free key (2 min)</a>
 </div>
 
 <!-- Header -->
@@ -282,73 +303,108 @@ const DEFAULT = {
 // ── State ─────────────────────────────────────────────────────────────────────
 let voiceOn=true, speaking=false, listening=false;
 let rec=null, micStream=null, pending='', lgText=false;
-let conversationContext = [];
-let _chosenVoice = null;
+let conversationContext=[];
+let _chosenVoice=null;
+let elKey='';
+let currentAudio=null;
+const EL_VOICE='21m00Tcm4TlvDq8ikWAM'; // Rachel — warm, natural
 
-// Pre-load and pick the best available voice once
-function pickVoice(){
-  if(_chosenVoice) return _chosenVoice;
-  const vv = window.speechSynthesis.getVoices();
-  // Priority order: enhanced/neural first, then standard fallbacks
-  const priority = [
-    'Samantha (Enhanced)',       // Mac — best natural female
-    'Karen (Enhanced)',          // Mac AU — warm
-    'Moira (Enhanced)',          // Mac IE — clear
-    'Microsoft Aria Online',     // Windows neural — very natural
-    'Microsoft Jenny Online',    // Windows neural
-    'Google US English',         // Chrome built-in — decent
-    'Samantha',                  // Mac standard
-    'Karen',
-    'Moira',
-    'Microsoft Aria',
-    'Microsoft Zira',
-  ];
-  for(const name of priority){
-    const v = vv.find(v=>v.name===name);
-    if(v){ _chosenVoice=v; return v; }
-  }
-  // Last resort: any en-US local voice
-  return vv.find(v=>v.lang==='en-US'&&v.localService) || vv.find(v=>v.lang==='en-US') || null;
+// ── ElevenLabs setup ──────────────────────────────────────────────────────────
+function initElKey(){
+  const saved = localStorage.getItem('el_key');
+  if(saved){ elKey=saved; setElStatus(true); }
 }
 
-// ── TTS ───────────────────────────────────────────────────────────────────────
-function speak(text){
-  if(!voiceOn||!window.speechSynthesis) return;
+function saveElKey(){
+  const v=document.getElementById('el-input').value.trim();
+  if(!v){ alert('Please paste your ElevenLabs API key.'); return; }
+  elKey=v;
+  localStorage.setItem('el_key',v);
+  document.getElementById('el-input').value='';
+  setElStatus(true);
+  speak('Hi Maggie, this is what I sound like. Much better, right?');
+}
+
+function setElStatus(ok){
+  const s=document.getElementById('el-status');
+  const l=document.getElementById('el-link');
+  if(ok){
+    s.textContent='✅ Natural voice enabled'; s.className='ok';
+    document.getElementById('el-bar').style.background='#052e16';
+    l.style.display='none';
+  } else {
+    s.textContent='❌ Key error — check and try again'; s.className='err';
+  }
+}
+
+// ── ElevenLabs TTS ────────────────────────────────────────────────────────────
+async function speakEl(text){
+  try{
+    const res=await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${EL_VOICE}/stream`,{
+      method:'POST',
+      headers:{'xi-api-key':elKey,'Content-Type':'application/json'},
+      body:JSON.stringify({
+        text,
+        model_id:'eleven_turbo_v2',
+        voice_settings:{stability:0.50,similarity_boost:0.82,style:0.30,use_speaker_boost:true}
+      })
+    });
+    if(!res.ok){ setElStatus(false); elKey=''; localStorage.removeItem('el_key'); return false; }
+    const blob=await res.blob();
+    const url=URL.createObjectURL(blob);
+    currentAudio=new Audio(url);
+    currentAudio.onplay=()=>{ speaking=true; document.getElementById('pause-btn').style.display='flex'; };
+    currentAudio.onended=()=>{ speaking=false; document.getElementById('pause-btn').style.display='none'; URL.revokeObjectURL(url); };
+    currentAudio.onerror=()=>{ speaking=false; document.getElementById('pause-btn').style.display='none'; };
+    await currentAudio.play();
+    return true;
+  }catch{ return false; }
+}
+
+// ── Browser TTS fallback ──────────────────────────────────────────────────────
+function pickVoice(){
+  if(_chosenVoice) return _chosenVoice;
+  const vv=window.speechSynthesis.getVoices();
+  const priority=['Samantha (Enhanced)','Karen (Enhanced)','Microsoft Aria Online (Natural)','Microsoft Jenny Online (Natural)','Google US English','Samantha','Karen','Microsoft Aria','Microsoft Zira'];
+  for(const name of priority){ const v=vv.find(v=>v.name===name); if(v){_chosenVoice=v;return v;} }
+  return vv.find(v=>v.lang==='en-US'&&v.localService)||vv.find(v=>v.lang==='en-US')||null;
+}
+
+function speakBrowser(text){
+  if(!window.speechSynthesis) return;
   window.speechSynthesis.cancel();
-  const u = new SpeechSynthesisUtterance(text);
-  // Warm, unhurried, natural cadence
-  u.rate  = 0.78;
-  u.pitch = 1.05;
-  u.volume = 1.0;
-  const doSpeak = ()=>{
-    const v = pickVoice();
-    if(v) u.voice = v;
-    u.onstart = ()=>{ speaking=true;  document.getElementById('pause-btn').style.display='flex'; };
-    u.onend   = ()=>{ speaking=false; document.getElementById('pause-btn').style.display='none'; };
-    u.onerror = ()=>{ speaking=false; document.getElementById('pause-btn').style.display='none'; };
+  const u=new SpeechSynthesisUtterance(text);
+  u.rate=0.78; u.pitch=1.05; u.volume=1.0;
+  const go=()=>{ const v=pickVoice(); if(v) u.voice=v;
+    u.onstart=()=>{ speaking=true; document.getElementById('pause-btn').style.display='flex'; };
+    u.onend=()=>{ speaking=false; document.getElementById('pause-btn').style.display='none'; };
+    u.onerror=()=>{ speaking=false; document.getElementById('pause-btn').style.display='none'; };
     window.speechSynthesis.speak(u);
   };
-  // Voices may not be loaded yet on first call
-  if(window.speechSynthesis.getVoices().length){
-    doSpeak();
-  } else {
-    window.speechSynthesis.onvoiceschanged = ()=>{ window.speechSynthesis.onvoiceschanged=null; doSpeak(); };
-  }
+  window.speechSynthesis.getVoices().length ? go() : (window.speechSynthesis.onvoiceschanged=()=>{window.speechSynthesis.onvoiceschanged=null;go();});
+}
+
+// ── Speak (ElevenLabs → browser fallback) ────────────────────────────────────
+async function speak(text){
+  if(!voiceOn) return;
+  stopSpeak();
+  if(elKey){ const ok=await speakEl(text); if(ok) return; }
+  speakBrowser(text);
 }
 
 function stopSpeak(){
   window.speechSynthesis?.cancel();
+  if(currentAudio){ currentAudio.pause(); currentAudio=null; }
   speaking=false;
   document.getElementById('pause-btn').style.display='none';
 }
-
-function saveElKey(){} // no-op, kept to avoid errors
 window.addEventListener('load', ()=>{
   // Show setup screen if on file://
   if(location.protocol === 'file:'){
     document.getElementById('setup-screen').classList.add('show');
     return;
   }
+  initElKey(); // load saved ElevenLabs key if exists
   initSpeech();
   const w = `Hi Maggie! I'm Dex, your Direct Express assistant. I'm here to help you 24 hours a day, 7 days a week. You can speak to me or type your question. What can I help you with today?`;
   addMsg('bot', w);
