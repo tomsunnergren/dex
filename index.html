@@ -76,7 +76,7 @@ body{font-family:'Inter',system-ui,sans-serif;background:#f5f5f5;height:100vh;di
 .qbtn{width:100%;text-align:left;padding:12px 15px;margin-bottom:6px;background:#fff;border:1px solid #ebebeb;border-radius:10px;cursor:pointer;font-size:15px;color:#222;font-weight:500;display:flex;align-items:center;justify-content:space-between;box-shadow:0 1px 2px rgba(0,0,0,.04);font-family:inherit;transition:border-color .15s;}
 .qbtn:hover{border-color:#86efac;background:#f9fffe;}
 #listen-bar{background:#f0fdf4;border-top:1px solid #bbf7d0;padding:9px 16px;text-align:center;max-width:560px;width:100%;margin:0 auto;display:none;flex-shrink:0;}
-#listen-bar span{color:#166534;font-size:14px;font-weight:500;}
+#listen-bar span{color:#166634;font-size:14px;font-weight:500;}
 #err-bar{background:#fff7ed;border-top:1px solid #fed7aa;padding:8px 16px;text-align:center;color:#9a3412;font-size:13px;max-width:560px;width:100%;margin:0 auto;display:none;flex-shrink:0;}
 #input-area{background:#fff;border-top:1px solid #ebebeb;padding:12px 16px;max-width:560px;width:100%;margin:0 auto;flex-shrink:0;}
 #mic-btn{width:100%;padding:15px;border-radius:12px;border:none;background:#1a5c32;color:#fff;font-size:17px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:9px;margin-bottom:8px;font-family:inherit;transition:background .2s;}
@@ -90,10 +90,7 @@ body{font-family:'Inter',system-ui,sans-serif;background:#f5f5f5;height:100vh;di
 #send.on{background:#1a5c32;cursor:pointer;}
 #footer{background:#fafafa;border-top:1px solid #ebebeb;padding:8px 16px;text-align:center;font-size:12.5px;color:#aaa;flex-shrink:0;}
 #footer strong{color:#1a5c32;}
-body.lg{font-size:19px;}
-body.lg .bubble{font-size:19px;}
-body.lg .qbtn{font-size:19px;}
-body.lg #mic-btn{font-size:21px;}
+body.lg{font-size:19px;}body.lg .bubble{font-size:19px;}body.lg .qbtn{font-size:19px;}body.lg #mic-btn{font-size:21px;}
 @keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.8}}
 @keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
@@ -201,6 +198,64 @@ const TX=[
   {date:"Mar 10",merchant:"Dollar General",amt:-14.38},
 ];
 
+// ── State ─────────────────────────────────────────────────────────────────────
+let voiceOn=true, speaking=false, listening=false;
+let rec=null, micStream=null, pending='', lgText=false;
+let _chosenVoice=null, elKey='', currentAudio=null;
+let disputedMerchant='';
+const GEMINI_KEY='AIzaSyD70iZMquUFh9dmpWFhaNsc3cLYUGXPDog';
+
+// ── Merchant detection ────────────────────────────────────────────────────────
+const MERCHANTS=[
+  {name:'Walgreens',re:/walgreen/i},{name:'Kroger',re:/kroger/i},
+  {name:'National Grid',re:/national.?grid/i},{name:'CVS Pharmacy',re:/cvs/i},
+  {name:"McDonald's",re:/mcdonald/i},{name:'Rite Aid',re:/rite.?aid/i},
+  {name:'Dollar General',re:/dollar.?general/i},{name:'Amazon',re:/amazon/i},
+];
+function detectMerchant(t){for(const m of MERCHANTS){if(m.re.test(t))return m.name;}return '';}
+
+// ── Gemini AI ─────────────────────────────────────────────────────────────────
+const SYS=`You are Dex, a warm, patient virtual assistant for Direct Express — a prepaid debit Mastercard for federal benefit recipients. You are speaking with Maggie, a senior cardholder.
+
+MAGGIE'S ACCOUNT:
+- Card ending: 4823, Balance: $612.47
+- Next deposit: $967.00 on Friday April 3, 2026 from Social Security
+
+MARCH TRANSACTIONS:
+Mar 23 Walgreens -$18.43, Mar 22 Kroger -$54.81, Mar 21 National Grid -$72.50,
+Mar 20 CVS Pharmacy -$11.29, Mar 19 McDonald's -$9.17,
+Mar 15 Social Security Deposit +$967.00, Mar 12 Rite Aid -$22.64, Mar 10 Dollar General -$14.38
+Total March spending (excl. deposit): $192.82
+
+FEBRUARY TRANSACTIONS:
+Feb 22 Kroger -$61.20, Feb 20 National Grid -$68.40, Feb 18 Walgreens -$24.10,
+Feb 15 Social Security Deposit +$967.00, Feb 14 CVS Pharmacy -$19.45,
+Feb 10 McDonald's -$11.30, Feb 8 Dollar General -$18.90
+Total February spending (excl. deposit): $203.35
+
+Today's date is March 25, 2026.
+
+RULES:
+- Warm, plain language, no jargon. 2-3 sentences max.
+- Always end with "Is there anything else I can help with?"
+- Only discuss Maggie's account and Direct Express topics.
+- Never invent data. Hotline: 1-888-741-1115.`;
+
+async function askAI(text){
+  const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_KEY}`,{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      system_instruction:{parts:[{text:SYS}]},
+      contents:[{parts:[{text}]}],
+      generationConfig:{maxOutputTokens:200,temperature:0.7}
+    })
+  });
+  const d=await res.json();
+  if(!res.ok) throw new Error(d.error?.message||'Gemini error');
+  return d.candidates[0].content.parts[0].text;
+}
+
 // ── Cards ─────────────────────────────────────────────────────────────────────
 function cardHTML(type){
   const txRows=TX.map(t=>`
@@ -211,66 +266,14 @@ function cardHTML(type){
       </div>
       <span class="tx-amt" style="color:${t.amt>0?'#1a5c32':'#111'}">${t.amt>0?'+':'−'}$${Math.abs(t.amt).toFixed(2)}</span>
     </div>`).join('');
-
   const C={
-    balance:`<div class="card" style="border-left-color:#1a5c32">
-      <div class="card-label">${IC.card} Direct Express •••• 4823</div>
-      <div class="card-amount">$612.47</div>
-      <div class="card-meta">Available Balance</div>
-      <hr class="card-divider"/>
-      <div class="card-footer">${IC.clock} Next deposit: <strong style="color:#111">$967.00</strong> &nbsp;·&nbsp; April 3, 2026</div>
-    </div>`,
-    txns:`<div class="card" style="border-left-color:#1a5c32">
-      <div class="card-label">${IC.list} Recent Transactions</div>
-      ${txRows}
-    </div>`,
-    locked:`<div class="card" style="border-left-color:#dc2626">
-      <div class="card-header">
-        <div class="card-icon" style="background:#fef2f2">${IC.lock}</div>
-        <div><div class="card-title">Card Locked — You're Protected</div><div class="card-sub">Card ending 4823</div></div>
-      </div>
-      <div class="card-row">${IC.check} Card locked — no new charges possible</div>
-      <div class="card-row">${IC.check} Replacement card being mailed to you</div>
-      <div class="card-row">${IC.check} Arrives in 5–7 business days</div>
-      <div class="card-row">${IC.check} You will receive a text when it ships</div>
-    </div>`,
-    dispute:`<div class="card" style="border-left-color:#f59e0b">
-      <div class="card-header">
-        <div class="card-icon" style="background:#fffbeb">${IC.alert}</div>
-        <div><div class="card-title">Dispute Opened${disputedMerchant?' — '+disputedMerchant:''}</div><div class="card-sub">Case number assigned</div></div>
-      </div>
-      <div class="card-row">${IC.check} Dispute recorded and assigned a case number</div>
-      <div class="card-row">${IC.clock} Investigation: up to 10 business days</div>
-      <div class="card-row">${IC.dollar} Provisional credit may be issued within 5 days</div>
-      <div class="card-row">${IC.phone} We will contact you with updates</div>
-    </div>`,
-    deposit:`<div class="card" style="border-left-color:#6366f1">
-      <div class="card-label">${IC.refresh} Next Deposit</div>
-      <div class="card-amount">$967.00</div>
-      <div class="card-meta">Social Security</div>
-      <hr class="card-divider"/>
-      <div class="card-footer">${IC.clock} Arriving <strong style="color:#111">Friday, April 3, 2026</strong></div>
-    </div>`,
-    pin:`<div class="card" style="border-left-color:#8b5cf6">
-      <div class="card-header">
-        <div class="card-icon" style="background:#f5f3ff">${IC.lockPurple}</div>
-        <div><div class="card-title">Reset Your PIN</div><div class="card-sub">Takes about 2 minutes</div></div>
-      </div>
-      <div class="pin-step"><div class="pin-num">1</div>Call 1-888-741-1115</div>
-      <div class="pin-step"><div class="pin-num">2</div>Press 2 for PIN services</div>
-      <div class="pin-step"><div class="pin-num">3</div>Follow the voice prompts</div>
-      <div class="pin-step"><div class="pin-num">4</div>New PIN works immediately</div>
-    </div>`,
-    fees:`<div class="card" style="border-left-color:#0ea5e9">
-      <div class="card-label">${IC.card} Your Card Fees</div>
-      <div class="fee-row"><span>Purchases anywhere</span><strong>Free — always</strong></div>
-      <div class="fee-row"><span>1st ATM withdrawal / month</span><strong>Free</strong></div>
-      <div class="fee-row"><span>Additional ATM withdrawals</span><strong>$0.85 each</strong></div>
-      <div class="fee-row"><span>Cash at a bank counter</span><strong>$1.50</strong></div>
-      <div class="fee-row"><span>Out-of-network ATM</span><strong>$3.00</strong></div>
-      <div class="fee-row"><span>Balance check at register</span><strong>Free</strong></div>
-      <div class="fee-row"><span>Monthly maintenance fee</span><strong>$0</strong></div>
-    </div>`
+    balance:`<div class="card" style="border-left-color:#1a5c32"><div class="card-label">${IC.card} Direct Express •••• 4823</div><div class="card-amount">$612.47</div><div class="card-meta">Available Balance</div><hr class="card-divider"/><div class="card-footer">${IC.clock} Next deposit: <strong style="color:#111">$967.00</strong> &nbsp;·&nbsp; April 3, 2026</div></div>`,
+    txns:`<div class="card" style="border-left-color:#1a5c32"><div class="card-label">${IC.list} Recent Transactions</div>${txRows}</div>`,
+    locked:`<div class="card" style="border-left-color:#dc2626"><div class="card-header"><div class="card-icon" style="background:#fef2f2">${IC.lock}</div><div><div class="card-title">Card Locked — You're Protected</div><div class="card-sub">Card ending 4823</div></div></div><div class="card-row">${IC.check} Card locked — no new charges possible</div><div class="card-row">${IC.check} Replacement card being mailed to you</div><div class="card-row">${IC.check} Arrives in 5–7 business days</div><div class="card-row">${IC.check} You will receive a text when it ships</div></div>`,
+    dispute:`<div class="card" style="border-left-color:#f59e0b"><div class="card-header"><div class="card-icon" style="background:#fffbeb">${IC.alert}</div><div><div class="card-title">Dispute Opened${disputedMerchant?' — '+disputedMerchant:''}</div><div class="card-sub">Case number assigned</div></div></div><div class="card-row">${IC.check} Dispute recorded and assigned a case number</div><div class="card-row">${IC.clock} Investigation: up to 10 business days</div><div class="card-row">${IC.dollar} Provisional credit may be issued within 5 days</div><div class="card-row">${IC.phone} We will contact you with updates</div></div>`,
+    deposit:`<div class="card" style="border-left-color:#6366f1"><div class="card-label">${IC.refresh} Next Deposit</div><div class="card-amount">$967.00</div><div class="card-meta">Social Security</div><hr class="card-divider"/><div class="card-footer">${IC.clock} Arriving <strong style="color:#111">Friday, April 3, 2026</strong></div></div>`,
+    pin:`<div class="card" style="border-left-color:#8b5cf6"><div class="card-header"><div class="card-icon" style="background:#f5f3ff">${IC.lockPurple}</div><div><div class="card-title">Reset Your PIN</div><div class="card-sub">Takes about 2 minutes</div></div></div><div class="pin-step"><div class="pin-num">1</div>Call 1-888-741-1115</div><div class="pin-step"><div class="pin-num">2</div>Press 2 for PIN services</div><div class="pin-step"><div class="pin-num">3</div>Follow the voice prompts</div><div class="pin-step"><div class="pin-num">4</div>New PIN works immediately</div></div>`,
+    fees:`<div class="card" style="border-left-color:#0ea5e9"><div class="card-label">${IC.card} Your Card Fees</div><div class="fee-row"><span>Purchases anywhere</span><strong>Free — always</strong></div><div class="fee-row"><span>1st ATM withdrawal / month</span><strong>Free</strong></div><div class="fee-row"><span>Additional ATM withdrawals</span><strong>$0.85 each</strong></div><div class="fee-row"><span>Cash at a bank counter</span><strong>$1.50</strong></div><div class="fee-row"><span>Out-of-network ATM</span><strong>$3.00</strong></div><div class="fee-row"><span>Balance check at register</span><strong>Free</strong></div><div class="fee-row"><span>Monthly maintenance fee</span><strong>$0</strong></div></div>`
   };
   return C[type]||'';
 }
@@ -297,57 +300,6 @@ const SCRIPTS=[
   {match:/thank|thanks|thank you|that helps|terrific|wonderful|great|perfect|awesome|that's all|goodbye|bye/i,card:null,reply:`You're very welcome, Maggie. Have a wonderful day — take care!`,followups:[]},
   {match:/hi|hello|hey|good morning|good afternoon|good evening/i,card:null,reply:`Hi Maggie, good to hear from you. What can I help with today?`,followups:["Check my balance","I lost my card","When is my next deposit?"]}
 ];
-const DEFAULT={reply:null,followups:[]};
-
-// ── State ─────────────────────────────────────────────────────────────────────
-let voiceOn=true,speaking=false,listening=false;
-let rec=null,micStream=null,pending='',lgText=false;
-let _chosenVoice=null,elKey='',currentAudio=null;
-let disputedMerchant='';
-
-const MERCHANTS=[
-  {name:'Walgreens',re:/walgreen/i},{name:'Kroger',re:/kroger/i},
-  {name:'National Grid',re:/national.?grid/i},{name:'CVS Pharmacy',re:/cvs/i},
-  {name:"McDonald's",re:/mcdonald/i},{name:'Rite Aid',re:/rite.?aid/i},
-  {name:'Dollar General',re:/dollar.?general/i},{name:'Amazon',re:/amazon/i},
-];
-function detectMerchant(t){for(const m of MERCHANTS){if(m.re.test(t))return m.name;}return '';}
-
-// ── Claude system prompt ──────────────────────────────────────────────────────
-const SYS=`You are Dex, a warm, patient virtual assistant for Direct Express — a prepaid debit Mastercard for federal benefit recipients. You are speaking with Maggie, a senior cardholder.
-
-MAGGIE'S ACCOUNT:
-- Card ending: 4823, Balance: $612.47
-- Next deposit: $967.00 on Friday April 3, 2026 from Social Security
-
-MARCH TRANSACTIONS:
-Mar 23 Walgreens -$18.43, Mar 22 Kroger -$54.81, Mar 21 National Grid -$72.50,
-Mar 20 CVS Pharmacy -$11.29, Mar 19 McDonald's -$9.17,
-Mar 15 Social Security Deposit +$967.00, Mar 12 Rite Aid -$22.64, Mar 10 Dollar General -$14.38
-Total March spending (excl. deposit): $192.82
-
-FEBRUARY TRANSACTIONS:
-Feb 22 Kroger -$61.20, Feb 20 National Grid -$68.40, Feb 18 Walgreens -$24.10,
-Feb 15 Social Security Deposit +$967.00, Feb 14 CVS Pharmacy -$19.45,
-Feb 10 McDonald's -$11.30, Feb 8 Dollar General -$18.90
-Total February spending (excl. deposit): $203.35
-
-RULES:
-- Warm, plain language, no jargon. 2-3 sentences max.
-- Always end with "Is there anything else I can help with?"
-- Only discuss Maggie's account and Direct Express topics.
-- Never invent data. Hotline: 1-888-741-1115.`;
-
-async function askClaude(text){
-  const res=await fetch('https://api.anthropic.com/v1/messages',{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:200,system:SYS,messages:[{role:'user',content:text}]})
-  });
-  const d=await res.json();
-  if(!res.ok) throw new Error(d.error?.message||'API error');
-  return d.content[0].text;
-}
 
 // ── ElevenLabs ────────────────────────────────────────────────────────────────
 const EL_VOICE='EXAVITQu4vr4xnSDxMaL';
@@ -396,9 +348,11 @@ function toggleVoice(){voiceOn=!voiceOn;if(!voiceOn)stopSpeak();document.getElem
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 window.addEventListener('load',()=>{
-  initElKey();initSpeech();
+  initElKey();
+  initSpeech();
   const w='Hi Maggie. What can I help you with today?';
-  addMsg('bot',w);setTimeout(()=>speak(w),500);
+  addMsg('bot',w);
+  setTimeout(()=>speak(w),500);
 });
 
 // ── Speech recognition ────────────────────────────────────────────────────────
@@ -441,7 +395,7 @@ async function send(text){
         ?`Got it and we're on it. I've opened a dispute for the ${disputedMerchant} charge and the details are on screen. Is there anything else I can help with?`
         :scripted.reply;
     } else {
-      reply=await askClaude(text);
+      reply=await askAI(text);
     }
     hideTyping();
     addMsg('bot',reply);
