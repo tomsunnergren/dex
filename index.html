@@ -20,24 +20,13 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f0f4f0;height:10
 #el-link{color:#818cf8;font-size:12px;text-decoration:none;white-space:nowrap;}
 #el-link:hover{text-decoration:underline;}
 
-/* Setup screen */
-#setup-screen{display:none;position:fixed;inset:0;background:#f0f4f0;z-index:200;flex-direction:column;align-items:center;justify-content:center;padding:24px;}
-#setup-screen.show{display:flex;}
-.setup-card{background:#fff;border-radius:20px;padding:32px 28px;max-width:460px;width:100%;box-shadow:0 8px 40px rgba(0,0,0,.12);text-align:center;}
-.setup-logo{background:#1B6B3A;color:#fff;font-weight:900;font-size:14px;letter-spacing:.5px;padding:5px 14px;border-radius:6px;display:inline-block;margin-bottom:20px;}
-.setup-card h2{font-size:22px;font-weight:800;color:#111;margin-bottom:8px;}
-.setup-card p{color:#6b7280;font-size:15px;line-height:1.6;margin-bottom:20px;}
-.setup-cmd{background:#1a1a2e;color:#22c55e;font-family:monospace;font-size:15px;padding:14px 18px;border-radius:10px;text-align:left;margin-bottom:20px;line-height:1.8;}
-.setup-cmd span{color:#9ca3af;font-size:13px;display:block;margin-bottom:4px;}
-.setup-note{font-size:13px;color:#9ca3af;margin-top:12px;}
-
 /* Header */
 #header{background:#1B6B3A;padding:12px 18px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
 .logo-pill{background:#fff;border-radius:5px;padding:3px 10px;font-weight:900;font-size:13px;color:#1B6B3A;letter-spacing:.5px;}
 .hdr-title{color:#fff;font-weight:700;font-size:17px;}
 .hdr-sub{color:rgba(255,255,255,.55);font-size:11px;}
 .hdr-btns{display:flex;gap:8px;}
-.hdr-btn{background:rgba(255,255,255,.18);border:none;border-radius:8px;padding:7px 12px;color:#fff;cursor:pointer;font-size:13px;font-weight:600;border:none;}
+.hdr-btn{background:rgba(255,255,255,.18);border:none;border-radius:8px;padding:7px 12px;color:#fff;cursor:pointer;font-size:13px;font-weight:600;}
 .hdr-btn:hover{background:rgba(255,255,255,.28);}
 
 /* Account bar */
@@ -105,29 +94,13 @@ body.lg #mic-btn{font-size:22px;}
 </head>
 <body>
 
-<!-- Setup screen: shown only when running from file:// -->
-<div id="setup-screen">
-  <div class="setup-card">
-    <div class="setup-logo">DIRECT EXPRESS®</div>
-    <h2>One quick step to enable voice</h2>
-    <p>Chrome blocks microphone access when opening HTML files directly. Run this one command in Terminal to launch properly:</p>
-    <div class="setup-cmd">
-      <span># Paste this into Terminal and press Enter:</span>
-      cd ~/Downloads && python3 -m http.server 8080
-    </div>
-    <p>Then open Chrome and go to:<br/>
-    <strong style="color:#1B6B3A;font-size:16px;">http://localhost:8080/direct-express-assistant.html</strong></p>
-    <p class="setup-note">This only needs to be done once per session. The Terminal window must stay open while demoing.</p>
-  </div>
-</div>
-
 <!-- ElevenLabs bar -->
 <div id="el-bar">
   <span>🎙️ Natural voice:</span>
-  <input id="el-input" type="password" placeholder="Paste free ElevenLabs API key here..."/>
+  <input id="el-input" type="password" placeholder="Paste ElevenLabs API key for human-sounding voice..."/>
   <button id="el-save" onclick="saveElKey()">Save</button>
-  <span id="el-status">Using browser voice — sounds robotic</span>
-  <a id="el-link" href="https://elevenlabs.io/app/sign-up" target="_blank">→ Get free key (2 min)</a>
+  <span id="el-status">Using browser voice</span>
+  <a id="el-link" href="https://elevenlabs.io/app/sign-up" target="_blank">→ Get free key</a>
 </div>
 
 <!-- Header -->
@@ -157,10 +130,11 @@ body.lg #mic-btn{font-size:22px;}
   <div id="chat"></div>
   <div id="qa">
     <p>Common questions — tap to get started</p>
-    <button class="qbtn" onclick="qs('What is my balance and recent transactions?')">💰 Balance &amp; transactions <span>›</span></button>
+    <button class="qbtn" onclick="qs('What is my balance?')">💰 Check my balance <span>›</span></button>
+    <button class="qbtn" onclick="qs('Show me my recent transactions.')">📋 Recent transactions <span>›</span></button>
     <button class="qbtn" onclick="qs('I lost my card.')">🃏 I lost my card <span>›</span></button>
-    <button class="qbtn" onclick="qs('There is a charge I do not recognize.')">❓ Dispute a charge <span>›</span></button>
-    <button class="qbtn" onclick="qs('When is my next Social Security deposit?')">📅 When is my deposit? <span>›</span></button>
+    <button class="qbtn" onclick="qs('I do not recognize a charge on my card.')">❓ Dispute a charge <span>›</span></button>
+    <button class="qbtn" onclick="qs('When is my next deposit?')">📅 When is my deposit? <span>›</span></button>
     <button class="qbtn" onclick="qs('I need to reset my PIN.')">🔒 Reset my PIN <span>›</span></button>
     <button class="qbtn" onclick="qs('What fees does my card charge?')">💳 Card fees <span>›</span></button>
   </div>
@@ -182,121 +156,120 @@ body.lg #mic-btn{font-size:22px;}
 <div id="footer">📞 Need more help? Call <strong>1-888-741-1115</strong> — available 24/7</div>
 
 <script>
-// ── Account data (realistic, fabricated) ─────────────────────────────────────
-const ACCT = {
-  name: "Maggie",
-  card: "4823",
-  balance: 612.47,
-  nextDeposit: { amount: 967.00, date: "April 3, 2026", day: "Friday", source: "Social Security" },
-  transactions: [
-    {date:"Mar 23",merchant:"Walgreens",amt:-18.43},
-    {date:"Mar 22",merchant:"Kroger",amt:-54.81},
-    {date:"Mar 21",merchant:"National Grid",amt:-72.50},
-    {date:"Mar 20",merchant:"CVS Pharmacy",amt:-11.29},
-    {date:"Mar 19",merchant:"McDonald's",amt:-9.17},
-    {date:"Mar 15",merchant:"Social Security Deposit",amt:+967.00},
-    {date:"Mar 12",merchant:"Rite Aid",amt:-22.64},
-    {date:"Mar 10",merchant:"Dollar General",amt:-14.38},
-  ]
-};
+// ── Account data ──────────────────────────────────────────────────────────────
+const TX = [
+  {date:"Mar 23",merchant:"Walgreens",amt:-18.43},
+  {date:"Mar 22",merchant:"Kroger",amt:-54.81},
+  {date:"Mar 21",merchant:"National Grid",amt:-72.50},
+  {date:"Mar 20",merchant:"CVS Pharmacy",amt:-11.29},
+  {date:"Mar 19",merchant:"McDonald's",amt:-9.17},
+  {date:"Mar 15",merchant:"Social Security Deposit",amt:+967.00},
+  {date:"Mar 12",merchant:"Rite Aid",amt:-22.64},
+  {date:"Mar 10",merchant:"Dollar General",amt:-14.38},
+];
 
-// ── Scripted responses ────────────────────────────────────────────────────────
-// Each entry: { match: regex, card: string|null, reply: string, followups: string[] }
+// ── Scripts ───────────────────────────────────────────────────────────────────
 const SCRIPTS = [
   {
     match: /balance|how much|available|funds|money.*(card|account)/i,
     card: 'balance',
-    reply: `Your current balance is $612.47, Maggie. That's what's available on your Direct Express card right now. Is there anything else I can help you with?`,
-    followups: ["Show my recent transactions", "When is my next deposit?", "What are my card fees?"]
+    reply: `I've pulled up your balance on screen. Does everything look right?`,
+    followups: ["Show my recent transactions", "When is my next deposit?", "Something doesn't look right"]
   },
   {
-    match: /transaction|history|recent|spent|purchase|statement|charges/i,
+    match: /transaction|history|recent|spent|purchase|statement|charges|show me/i,
     card: 'txns',
-    reply: `Here are your most recent transactions. Your last purchase was $18.43 at Walgreens on March 23rd. Your Social Security deposit of $967.00 came in on March 15th. Is there anything else I can help you with?`,
-    followups: ["What is my balance?", "I don't recognize one of these charges", "When is my next deposit?"]
+    reply: `Here are your recent transactions. Do you recognize everything on the list?`,
+    followups: ["Something doesn't look right", "What is my balance?", "When is my next deposit?"]
   },
   {
     match: /lost|stolen|missing.*card|can't find.*card|someone.*used|unauthorized|fraud|lock.*card/i,
     card: 'locked',
-    reply: `I'm sorry to hear that, Maggie. I've locked your card ending in 4823 right now, so no new charges can go through. A replacement card will be mailed to your address and should arrive in 5 to 7 business days. You'll get a text message when it ships. Is there anything else I can help you with?`,
+    reply: `I've locked your card right now so nothing can go through. I've put the next steps on screen for you. Is there anything else I can help with?`,
     followups: ["Will I still get my deposit?", "How do I activate the new card?", "What if I find my old card?"]
   },
   {
-    match: /dispute|don't recognize|didn't make|wrong charge|suspicious|unauthorized charge|unusual/i,
+    match: /dispute|don't recognize|do not recognize|didn't make|wrong charge|suspicious|unauthorized charge|unusual|these charges|this charge|not mine/i,
     card: 'dispute',
-    reply: `I understand — that can be concerning. I've flagged this for our disputes team and opened a case for you. We'll investigate within 10 business days. In many cases, a provisional credit is issued to your card within 5 business days while we look into it. We'll contact you by text once we have an update. Is there anything else I can help you with?`,
-    followups: ["Which transaction should I dispute?", "How long does a dispute take?", "Can I see my recent transactions?"]
+    reply: `I'm sorry to hear that. I've put the details on screen. Which transaction looks wrong — do you see it in the list?`,
+    followups: ["It was the Amazon charge", "It was the Walgreens charge", "Show me my transactions"]
   },
   {
     match: /deposit|payment|social security|ssa|benefit.*arrive|when.*money|direct deposit/i,
     card: 'deposit',
-    reply: `Your next Social Security deposit of $967.00 is scheduled for Friday, April 3rd. That's 10 days from now. It will be on your card first thing that morning. Is there anything else I can help you with?`,
-    followups: ["What is my current balance?", "What if my deposit doesn't arrive?", "Show my recent transactions"]
+    reply: `I've pulled up your next deposit on screen. Does that look right to you?`,
+    followups: ["What is my current balance?", "What if it doesn't arrive?", "Show my recent transactions"]
   },
   {
     match: /deposit.*not.*arrive|missing.*deposit|didn't.*receive|where.*deposit|deposit.*late/i,
     card: 'deposit',
-    reply: `I'm sorry your deposit hasn't shown up yet, Maggie. Most Social Security payments arrive by 9 AM on the scheduled date, but occasionally they can take until the end of the business day. If it still hasn't arrived by tomorrow morning, please call us at 1-888-741-1115 and we can look into it right away. Is there anything else I can help you with?`,
-    followups: ["What is my balance?", "When was my last deposit?", "Call Direct Express"]
+    reply: `Most deposits arrive by nine in the morning. If it's still not there by end of day, call us at one eight eight eight, seven four one, one one one five and we'll sort it out. Is there anything else I can help with?`,
+    followups: ["What is my balance?", "Show my recent transactions", "Talk to someone"]
   },
   {
     match: /pin|password|forgot.*pin|change.*pin|reset.*pin/i,
     card: 'pin',
-    reply: `No problem, Maggie. Resetting your PIN is quick and easy. Just call 1-888-741-1115, then press 2 for PIN services. The automated system will walk you through it — it only takes about 2 minutes. Your new PIN will work right away. Is there anything else I can help you with?`,
-    followups: ["What if I can't remember my old PIN?", "Is there a fee to reset my PIN?", "What else can you help with?"]
+    reply: `Resetting your PIN is easy. I've put the steps on screen — it only takes about two minutes. Is there anything else I can help with?`,
+    followups: ["What if I can't remember my old PIN?", "What is my balance?", "Talk to someone"]
   },
   {
     match: /fee|fees|cost|how much.*charge|charges.*card|what.*cost/i,
     card: 'fees',
-    reply: `Good news — most things on your Direct Express card are free. Purchases at any store are always free. Your first ATM cash withdrawal each month is also free. After that, it's 85 cents per ATM withdrawal. Is there anything else I can help you with?`,
+    reply: `I've pulled up your card fees on screen. The good news is most things are free. Any questions about what you see?`,
     followups: ["What is my current balance?", "How do I find a free ATM?", "When is my next deposit?"]
   },
   {
     match: /activate|new card|activate.*card|card.*activate/i,
     card: null,
-    reply: `To activate your new card, just call 1-888-741-1115. Have your new card ready along with the last four digits of your Social Security number. Activation takes just a couple of minutes, and your card will be ready to use right away. Is there anything else I can help you with?`,
-    followups: ["How do I set my PIN?", "What is my balance?", "Can I use the card right after activating?"]
+    reply: `To activate your new card, call one eight eight eight, seven four one, one one one five. Have your card and the last four digits of your Social Security number ready. It only takes a couple of minutes. Is there anything else I can help with?`,
+    followups: ["How do I set my PIN?", "What is my balance?", "Talk to someone"]
   },
   {
     match: /address|change.*address|update.*address|move|new address/i,
     card: null,
-    reply: `To update your address, please call us at 1-888-741-1115. Have your card and the last four digits of your Social Security number handy. It only takes a few minutes and your account will be updated right away. Is there anything else I can help you with?`,
-    followups: ["Will my next deposit still arrive?", "What else can you help with?", "What is my balance?"]
+    reply: `To update your address, call us at one eight eight eight, seven four one, one one one five. Have your card and Social Security number handy. Is there anything else I can help with?`,
+    followups: ["Will my next deposit still arrive?", "What is my balance?", "Talk to someone"]
   },
   {
     match: /atm|cash|withdraw/i,
     card: null,
-    reply: `You can use your Direct Express card at any ATM. Your first cash withdrawal each deposit cycle is free. After that, it's 85 cents per withdrawal at in-network ATMs, or $3.00 at out-of-network ATMs. To find a free ATM near you, look for Allpoint or MoneyPass ATMs — there are thousands of locations nationwide. Is there anything else I can help you with?`,
+    reply: `Your first withdrawal each month is free. After that it's eighty-five cents at in-network ATMs. Look for Allpoint or MoneyPass to avoid fees. Is there anything else I can help with?`,
     followups: ["What is my current balance?", "What are all my card fees?", "When is my next deposit?"]
-  },
-  {
-    match: /interest|earn|savings/i,
-    card: null,
-    reply: `Your Direct Express card is a prepaid debit card, so it doesn't earn interest. But it also means there's no risk of overdraft or debt — you can only spend what's on the card. Is there anything else I can help you with?`,
-    followups: ["What is my balance?", "What fees does my card have?", "When is my next deposit?"]
   },
   {
     match: /speak|agent|representative|human|real person|call|talk.*someone/i,
     card: null,
-    reply: `Of course, Maggie. You can reach a Direct Express representative any time by calling 1-888-741-1115. They're available 24 hours a day, 7 days a week. Is there anything else I can help you with before you call?`,
+    reply: `Of course. Call us any time at one eight eight eight, seven four one, one one one five — we're available around the clock. Is there anything else before you call?`,
     followups: ["What is my balance?", "Show my recent transactions", "When is my next deposit?"]
+  },
+  {
+    match: /find my card|found my card|card showed up/i,
+    card: null,
+    reply: `That's great news. Since we already locked the old card, call us at one eight eight eight, seven four one, one one one five to get it reactivated. Is there anything else I can help with?`,
+    followups: ["What is my balance?", "When is my next deposit?", "Talk to someone"]
+  },
+  {
+    match: /still get.*deposit|deposit.*still come|affect.*deposit/i,
+    card: 'deposit',
+    reply: `Yes — locking your card has no effect on your deposits. Your next deposit will arrive right on schedule. I've pulled it up on screen.`,
+    followups: ["What is my balance?", "How do I activate the new card?", "Talk to someone"]
   },
   {
     match: /thank|thanks|thank you|that helps|helpful/i,
     card: null,
-    reply: `You're very welcome, Maggie! It's my pleasure to help. Is there anything else I can help you with today?`,
+    reply: `You're very welcome, Maggie. Is there anything else I can help with today?`,
     followups: ["Check my balance", "Show my recent transactions", "When is my next deposit?"]
   },
   {
     match: /hi|hello|hey|good morning|good afternoon|good evening/i,
     card: null,
-    reply: `Hello again, Maggie! It's good to hear from you. What can I help you with today?`,
+    reply: `Hi Maggie, good to hear from you. What can I help with today?`,
     followups: ["Check my balance", "I lost my card", "When is my next deposit?"]
   }
 ];
 
 const DEFAULT = {
-  reply: `I want to make sure I get you the right help. Could you tell me a little more about what you need? I can help with your balance, transactions, a lost card, disputes, deposits, your PIN, or card fees. Is there anything else I can clarify?`,
+  reply: `I want to make sure I get you the right help. I can assist with your balance, recent transactions, a lost card, a disputed charge, your deposit, your PIN, or card fees. What would you like help with?`,
   followups: ["Check my balance", "I lost my card", "Dispute a charge", "When is my next deposit?"]
 };
 
@@ -309,9 +282,9 @@ let elKey='';
 let currentAudio=null;
 const EL_VOICE='EXAVITQu4vr4xnSDxMaL'; // Sarah — warm, natural, free tier
 
-// ── ElevenLabs setup ──────────────────────────────────────────────────────────
+// ── ElevenLabs ────────────────────────────────────────────────────────────────
 function initElKey(){
-  const saved = localStorage.getItem('el_key');
+  const saved=localStorage.getItem('el_key');
   if(saved){ elKey=saved; setElStatus(true); }
 }
 
@@ -337,58 +310,19 @@ function setElStatus(ok){
   }
 }
 
-// ── ElevenLabs TTS ────────────────────────────────────────────────────────────
-// Convert numbers/symbols to natural spoken form before sending to ElevenLabs
-function prepareForSpeech(text){
-  return text
-    // Dollar amounts with cents e.g. $478.54 → "478 dollars and 54 cents"
-    .replace(/\$(\d+)\.(\d{2})/g, (_, d, c) => `${numberToWords(parseInt(d))} dollars and ${numberToWords(parseInt(c))} cents`)
-    // Dollar amounts without cents e.g. $943 → "943 dollars"
-    .replace(/\$(\d+)/g, (_, d) => `${numberToWords(parseInt(d))} dollars`)
-    // Dates e.g. April 3, 2026 → already fine but numbers like "3rd" help
-    .replace(/\b(\d+)th\b/g, (_, n) => `${numberToWords(parseInt(n))}th`)
-    .replace(/\b(\d+)st\b/g, (_, n) => `${numberToWords(parseInt(n))}st`)
-    .replace(/\b(\d+)nd\b/g, (_, n) => `${numberToWords(parseInt(n))}nd`)
-    .replace(/\b(\d+)rd\b/g, (_, n) => `${numberToWords(parseInt(n))}rd`)
-    // Phone numbers e.g. 1-888-741-1115 → "1 888 741 1115"
-    .replace(/(\d)-(\d{3})-(\d{3})-(\d{4})/g, '$1 $2 $3 $4')
-    // Plain numbers
-    .replace(/\b(\d+)\b/g, (_, n) => numberToWords(parseInt(n)))
-    // Clean up
-    .replace(/\s+/g, ' ').trim();
-}
-
-function numberToWords(n){
-  if(n===0) return 'zero';
-  const ones=['','one','two','three','four','five','six','seven','eight','nine',
-    'ten','eleven','twelve','thirteen','fourteen','fifteen','sixteen','seventeen','eighteen','nineteen'];
-  const tens=['','','twenty','thirty','forty','fifty','sixty','seventy','eighty','ninety'];
-  if(n<20) return ones[n];
-  if(n<100) return tens[Math.floor(n/10)]+(n%10?'-'+ones[n%10]:'');
-  if(n<1000) return ones[Math.floor(n/100)]+' hundred'+(n%100?' '+numberToWords(n%100):'');
-  if(n<10000) return ones[Math.floor(n/1000)]+' thousand'+(n%1000?' '+numberToWords(n%1000):'');
-  return String(n); // fallback for very large numbers
-}
-
 async function speakEl(text){
-  text = prepareForSpeech(text);
   try{
-    // Try turbo first, fall back to standard
-    const models = ['eleven_turbo_v2_5', 'eleven_turbo_v2', 'eleven_monolingual_v1', 'eleven_multilingual_v2'];
+    const models=['eleven_turbo_v2_5','eleven_turbo_v2','eleven_monolingual_v1','eleven_multilingual_v2'];
     let res, lastError;
     for(const model of models){
-      res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${EL_VOICE}`,{
+      res=await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${EL_VOICE}`,{
         method:'POST',
         headers:{'xi-api-key':elKey,'Content-Type':'application/json','Accept':'audio/mpeg'},
-        body:JSON.stringify({
-          text,
-          model_id: model,
-          voice_settings:{stability:0.50,similarity_boost:0.82}
-        })
+        body:JSON.stringify({text, model_id:model, voice_settings:{stability:0.50,similarity_boost:0.82}})
       });
       if(res.ok) break;
-      const err = await res.clone().json().catch(()=>({}));
-      lastError = `${res.status}: ${err?.detail?.message||'unknown'}`;
+      const err=await res.clone().json().catch(()=>({}));
+      lastError=`${res.status}: ${err?.detail?.message||'unknown'}`;
     }
     if(!res.ok){
       document.getElementById('el-status').textContent=`❌ ${lastError}`;
@@ -433,7 +367,6 @@ function speakBrowser(text){
   window.speechSynthesis.getVoices().length ? go() : (window.speechSynthesis.onvoiceschanged=()=>{window.speechSynthesis.onvoiceschanged=null;go();});
 }
 
-// ── Speak (ElevenLabs → browser fallback) ────────────────────────────────────
 async function speak(text){
   if(!voiceOn) return;
   stopSpeak();
@@ -447,57 +380,54 @@ function stopSpeak(){
   speaking=false;
   document.getElementById('pause-btn').style.display='none';
 }
-window.addEventListener('load', ()=>{
-  // Show setup screen if on file://
-  if(location.protocol === 'file:'){
-    document.getElementById('setup-screen').classList.add('show');
-    return;
-  }
-  initElKey(); // load saved ElevenLabs key if exists
+
+function toggleVoice(){
+  voiceOn=!voiceOn;
+  if(!voiceOn) stopSpeak();
+  document.getElementById('vt-btn').textContent=voiceOn?'🔊 Voice On':'🔇 Voice Off';
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+window.addEventListener('load',()=>{
+  initElKey();
   initSpeech();
-  const w = `Hi Maggie! I'm Dex, your Direct Express assistant. I'm here to help you 24 hours a day, 7 days a week. You can speak to me or type your question. What can I help you with today?`;
-  addMsg('bot', w);
-  setTimeout(()=>speak(w), 500);
+  const w=`Hi Maggie! I'm Dex, your Direct Express assistant. I'm here to help you any time of day. You can speak to me or type your question. What can I help you with today?`;
+  addMsg('bot',w);
+  setTimeout(()=>speak(w),500);
 });
 
 // ── Speech Recognition ────────────────────────────────────────────────────────
 function initSpeech(){
   if(!('SpeechRecognition' in window||'webkitSpeechRecognition' in window)){
-    document.getElementById('mic-btn').textContent = 'Voice not supported — please use Chrome';
-    document.getElementById('mic-btn').disabled = true;
+    document.getElementById('mic-btn').textContent='Voice not supported — please use Chrome';
+    document.getElementById('mic-btn').disabled=true;
     return;
   }
   navigator.mediaDevices.getUserMedia({audio:true})
     .then(s=>{ micStream=s; })
-    .catch(()=>showErr('Microphone access denied. Click the 🔒 icon in the address bar and allow microphone access.'));
+    .catch(()=>showErr('Microphone access denied. Click the 🔒 icon in the address bar to allow it.'));
 
-  const SR = window.SpeechRecognition||window.webkitSpeechRecognition;
-  rec = new SR();
-  rec.continuous = false;
-  rec.interimResults = true;
-  rec.lang = 'en-US';
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  rec=new SR();
+  rec.continuous=false; rec.interimResults=true; rec.lang='en-US';
 
-  rec.onresult = e=>{
-    let interim='', final='';
+  rec.onresult=e=>{
+    let interim='',final='';
     for(let i=e.resultIndex;i<e.results.length;i++){
       const t=e.results[i][0].transcript;
       if(e.results[i].isFinal) final+=t; else interim+=t;
     }
     if(final) pending+=final;
-    document.getElementById('listen-txt').textContent = interim ? `"${interim}"` : '🎙️ Listening — speak now...';
+    document.getElementById('listen-txt').textContent=interim?`"${interim}"`:' 🎙️ Listening — speak now...';
   };
 
-  rec.onerror = e=>{
+  rec.onerror=e=>{
     setListening(false);
-    const msgs = {
-      'no-speech': "I didn't hear anything. Please tap the button and try again.",
-      'not-allowed': "Microphone blocked. Click the 🔒 in the address bar to allow it.",
-      'audio-capture': "No microphone found. Please check your microphone is connected.",
-    };
+    const msgs={'no-speech':"I didn't hear anything. Please tap the button and try again.",'not-allowed':"Microphone blocked. Click the 🔒 in the address bar to allow it."};
     showErr(msgs[e.error]||`Couldn't hear you clearly. Please try again.`);
   };
 
-  rec.onend = ()=>{
+  rec.onend=()=>{
     setListening(false);
     if(pending.trim()){ const t=pending.trim(); pending=''; send(t); }
   };
@@ -508,7 +438,7 @@ function toggleMic(){
   if(listening){ rec.stop(); setListening(false); return; }
   stopSpeak(); pending=''; hideErr();
   try{ rec.start(); setListening(true); }
-  catch{ setTimeout(()=>{ rec.start(); setListening(true); }, 300); }
+  catch{ setTimeout(()=>{ rec.start(); setListening(true); },300); }
 }
 
 function setListening(v){
@@ -525,54 +455,33 @@ function setListening(v){
   }
 }
 
-// ── TTS ───────────────────────────────────────────────────────────────────────
-function toggleVoice(){
-  voiceOn=!voiceOn;
-  if(!voiceOn) stopSpeak();
-  document.getElementById('vt-btn').textContent = voiceOn ? '🔊 Voice On' : '🔇 Voice Off';
-}
-
 // ── Response engine ───────────────────────────────────────────────────────────
 function getResponse(text){
-  for(const s of SCRIPTS){
-    if(s.match.test(text)) return s;
-  }
-  // Fuzzy fallback — check last context
-  if(conversationContext.includes('dispute') && /yes|correct|that one|it was|the|amazon|kroger|walgreens|cvs|mcdonald/i.test(text)){
-    return SCRIPTS.find(s=>s.card==='dispute');
-  }
-  if(conversationContext.includes('lost') && /yes|please|sure|ok/i.test(text)){
-    return SCRIPTS.find(s=>s.card==='locked');
-  }
+  for(const s of SCRIPTS){ if(s.match.test(text)) return s; }
   return DEFAULT;
 }
 
-// ── Send message ──────────────────────────────────────────────────────────────
-function send(text){
+async function send(text){
   if(!text.trim()) return;
   hideErr();
   document.getElementById('qa').style.display='none';
-  addMsg('user', text);
+  addMsg('user',text);
   detectIntent(text);
-
-  // Simulate thinking delay
   showTyping();
-  const resp = getResponse(text);
-  if(resp.card) conversationContext.push(resp.card);
-
+  const resp=getResponse(text);
   setTimeout(()=>{
     hideTyping();
-    addMsg('bot', resp.reply);
-    if(resp.followups && resp.followups.length) showFU(resp.followups);
+    addMsg('bot',resp.reply);
+    if(resp.followups&&resp.followups.length) showFU(resp.followups);
     speak(resp.reply);
-  }, 900 + Math.random()*400);
+  }, 800+Math.random()*300);
 }
 
 function qs(t){ send(t); }
 function sendTxt(){ const v=document.getElementById('txt').value.trim(); if(!v)return; document.getElementById('txt').value=''; updSend(); send(v); }
 function onTxtInput(){ updSend(); }
 function onTxtKey(e){ if(e.key==='Enter') sendTxt(); }
-function updSend(){ document.getElementById('send').className = document.getElementById('txt').value.trim() ? 'on' : ''; }
+function updSend(){ document.getElementById('send').className=document.getElementById('txt').value.trim()?'on':''; }
 
 // ── Follow-up chips ───────────────────────────────────────────────────────────
 function showFU(chips){
@@ -590,17 +499,17 @@ function showFU(chips){
 function detectIntent(t){
   t=t.toLowerCase();
   if(/lost|stolen|lock/i.test(t)) return showCard('locked');
-  if(/dispute|don't recognize|didn't make|wrong charge|suspicious|unusual/i.test(t)) return showCard('dispute');
+  if(/dispute|don't recognize|do not recognize|didn't make|wrong charge|suspicious|unusual|not mine|these charges/i.test(t)) return showCard('dispute');
   if(/balance|how much.*available/i.test(t)) return showCard('balance');
-  if(/transaction|history|spent|recent/i.test(t)) return showCard('txns');
-  if(/deposit|social security|when.*money|next.*payment/i.test(t)) return showCard('deposit');
+  if(/transaction|history|spent|recent|show me/i.test(t)) return showCard('txns');
+  if(/deposit|social security|when.*money|next.*payment|still get.*deposit|affect.*deposit/i.test(t)) return showCard('deposit');
   if(/pin|reset.*pin/i.test(t)) return showCard('pin');
   if(/fee|fees/i.test(t)) return showCard('fees');
 }
 
 function showCard(type){
   const a=document.getElementById('card-area');
-  const txRows=ACCT.transactions.map(t=>`
+  const txRows=TX.map(t=>`
     <div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid #f3f4f6;font-size:14px">
       <div><div style="font-weight:600">${t.merchant}</div><div style="font-size:12px;color:#9ca3af">${t.date}</div></div>
       <span style="font-weight:700;color:${t.amt>0?'#16a34a':'#374151'}">${t.amt>0?'+':''}$${Math.abs(t.amt).toFixed(2)}</span>
