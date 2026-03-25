@@ -107,10 +107,15 @@ body.lg{font-size:19px;}body.lg .bubble{font-size:19px;}body.lg .qbtn{font-size:
 </div>
 
 <div id="el-bar">
-  <span>🎙 Natural voice:</span>
+  <span>🤖 Groq:</span>
+  <input id="groq-input" type="password" placeholder="Paste Groq API key..."/>
+  <button id="groq-save" onclick="saveGroqKey()">Save</button>
+  <span id="groq-status" style="font-size:11.5px;white-space:nowrap;color:#8b949e;">No key</span>
+  <div style="width:1px;height:16px;background:#30363d;flex-shrink:0"></div>
+  <span>🎙 Voice:</span>
   <input id="el-input" type="password" placeholder="Paste ElevenLabs API key..."/>
   <button id="el-save" onclick="saveElKey()">Save</button>
-  <span id="el-status">Using browser voice</span>
+  <span id="el-status">Browser voice</span>
   <a id="el-link" href="https://elevenlabs.io/app/sign-up" target="_blank">→ Get free key</a>
 </div>
 
@@ -198,13 +203,6 @@ const TX=[
   {date:"Mar 10",merchant:"Dollar General",amt:-14.38},
 ];
 
-// ── State ─────────────────────────────────────────────────────────────────────
-let voiceOn=true, speaking=false, listening=false;
-let rec=null, micStream=null, pending='', lgText=false;
-let _chosenVoice=null, elKey='', currentAudio=null;
-let disputedMerchant='';
-const GEMINI_KEY='AIzaSyAWMsm6RT1Rr0ek2FZRJP4ORIilsTntzLg';
-
 // ── Merchant detection ────────────────────────────────────────────────────────
 const MERCHANTS=[
   {name:'Walgreens',re:/walgreen/i},{name:'Kroger',re:/kroger/i},
@@ -214,7 +212,15 @@ const MERCHANTS=[
 ];
 function detectMerchant(t){for(const m of MERCHANTS){if(m.re.test(t))return m.name;}return '';}
 
-// ── Gemini AI ─────────────────────────────────────────────────────────────────
+// ── State ─────────────────────────────────────────────────────────────────────
+let voiceOn=true, speaking=false, listening=false;
+let rec=null, micStream=null, pending='', lgText=false;
+let _chosenVoice=null, elKey='', currentAudio=null;
+let disputedMerchant='';
+
+// ── Groq AI ───────────────────────────────────────────────────────────────────
+let groqKey='';
+
 const SYS=`You are Dex, a warm, patient virtual assistant for Direct Express — a prepaid debit Mastercard for federal benefit recipients. You are speaking with Maggie, a senior cardholder.
 
 MAGGIE'S ACCOUNT:
@@ -241,20 +247,28 @@ RULES:
 - Only discuss Maggie's account and Direct Express topics.
 - Never invent data. Hotline: 1-888-741-1115.`;
 
+function initGroqKey(){const s=localStorage.getItem('groq_key');if(s){groqKey=s;setGroqStatus(true);}}
+function saveGroqKey(){const v=document.getElementById('groq-input').value.trim();if(!v){alert('Please paste your Groq API key.');return;}groqKey=v;localStorage.setItem('groq_key',v);document.getElementById('groq-input').value='';setGroqStatus(true);}
+function setGroqStatus(ok){const s=document.getElementById('groq-status');if(ok){s.textContent='✅ Ready';s.style.color='#3fb950';}else{s.textContent='❌ Key error';s.style.color='#f85149';}}
+
 async function askAI(text){
-  const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_KEY}`,{
+  if(!groqKey) throw new Error('No Groq API key — please paste your key in the bar above.');
+  const res=await fetch('https://api.groq.com/openai/v1/chat/completions',{
     method:'POST',
-    headers:{'Content-Type':'application/json'},
+    headers:{'Content-Type':'application/json','Authorization':`Bearer ${groqKey}`},
     body:JSON.stringify({
-      system_instruction:{parts:[{text:SYS}]},
-      contents:[{parts:[{text}]}],
-      generationConfig:{maxOutputTokens:200,temperature:0.7}
+      model:'llama-3.1-8b-instant',
+      max_tokens:200,
+      temperature:0.7,
+      messages:[
+        {role:'system',content:SYS},
+        {role:'user',content:text}
+      ]
     })
   });
   const d=await res.json();
-  if(!res.ok) throw new Error(`Gemini ${res.status}: ${d.error?.message||'unknown error'}`);
-  if(!d.candidates?.[0]?.content?.parts?.[0]?.text) throw new Error('No response from Gemini');
-  return d.candidates[0].content.parts[0].text;
+  if(!res.ok) throw new Error(`Groq ${res.status}: ${d.error?.message||'unknown error'}`);
+  return d.choices[0].message.content;
 }
 
 // ── Cards ─────────────────────────────────────────────────────────────────────
@@ -349,6 +363,7 @@ function toggleVoice(){voiceOn=!voiceOn;if(!voiceOn)stopSpeak();document.getElem
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 window.addEventListener('load',()=>{
+  initGroqKey();
   initElKey();
   initSpeech();
   const w='Hi Maggie. What can I help you with today?';
