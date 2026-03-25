@@ -352,7 +352,107 @@ const MERCHANT_LIST=[
   {name:'Amazon',re:/amazon/i},
 ];
 function detectMerchant(text){for(const m of MERCHANT_LIST){if(m.re.test(text))return m.name;}return '';}
-const EL_VOICE='EXAVITQu4vr4xnSDxMaL';
+const CLAUDE_SYSTEM = `You are Dex, a warm, patient virtual assistant for Direct Express — a prepaid debit Mastercard for federal benefit recipients. You are speaking with Maggie, a senior cardholder.
+
+MAGGIE'S ACCOUNT:
+- Card ending: 4823
+- Current balance: $612.47
+- Next deposit: $967.00 on Friday April 3, 2026 from Social Security
+
+MARCH TRANSACTIONS:
+- Mar 23: Walgreens -$18.43
+- Mar 22: Kroger -$54.81
+- Mar 21: National Grid -$72.50
+- Mar 20: CVS Pharmacy -$11.29
+- Mar 19: McDonald's -$9.17
+- Mar 15: Social Security Deposit +$967.00
+- Mar 12: Rite Aid -$22.64
+- Mar 10: Dollar General -$14.38
+Total March spending: $192.82
+
+FEBRUARY TRANSACTIONS (for comparison):
+- Feb 22: Kroger -$61.20
+- Feb 20: National Grid -$68.40
+- Feb 18: Walgreens -$24.10
+- Feb 15: Social Security Deposit +$967.00
+- Feb 14: CVS Pharmacy -$19.45
+- Feb 10: McDonald's -$11.30
+- Feb 8: Dollar General -$18.90
+Total February spending: $203.35
+
+RULES:
+- Warm, clear, plain language. No jargon.
+- Keep responses to 2-3 sentences max — this is a voice interface.
+- Always end with "Is there anything else I can help with?"
+- Only answer questions about Maggie's account and Direct Express.
+- Never make up information not in the account data above.
+- Hotline for anything else: 1-888-741-1115`;
+
+async function askClaude(text){
+  const res=await fetch('https://api.anthropic.com/v1/messages',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      model:'claude-sonnet-4-20250514',
+      max_tokens:200,
+      system:CLAUDE_SYSTEM,
+      messages:[{role:'user',content:text}]
+    })
+  });
+  const data=await res.json();
+  if(!res.ok) throw new Error(data.error?.message||'API error');
+  return data.content[0].text;
+} = `You are Dex, a warm, patient virtual assistant for Direct Express — a prepaid debit Mastercard for federal benefit recipients. You are speaking with Maggie, a senior cardholder.
+
+MAGGIE'S ACCOUNT:
+- Card ending: 4823
+- Current balance: $612.47
+- Next deposit: $967.00 on Friday April 3, 2026 from Social Security
+
+MARCH TRANSACTIONS:
+- Mar 23: Walgreens -$18.43
+- Mar 22: Kroger -$54.81
+- Mar 21: National Grid -$72.50
+- Mar 20: CVS Pharmacy -$11.29
+- Mar 19: McDonald's -$9.17
+- Mar 15: Social Security Deposit +$967.00
+- Mar 12: Rite Aid -$22.64
+- Mar 10: Dollar General -$14.38
+Total March spending: $192.82
+
+FEBRUARY TRANSACTIONS (for comparison):
+- Feb 22: Kroger -$61.20
+- Feb 20: National Grid -$68.40
+- Feb 18: Walgreens -$24.10
+- Feb 15: Social Security Deposit +$967.00
+- Feb 14: CVS Pharmacy -$19.45
+- Feb 10: McDonald's -$11.30
+- Feb 8: Dollar General -$18.90
+Total February spending: $203.35
+
+RULES:
+- Warm, clear, plain language. No jargon.
+- Keep responses to 2-3 sentences max — this is a voice interface.
+- Always end with "Is there anything else I can help with?"
+- Only answer questions about Maggie's account and Direct Express.
+- Never make up information not in the account data above.
+- Hotline for anything else: 1-888-741-1115`;
+
+async function askClaude(text){
+  const res=await fetch('https://api.anthropic.com/v1/messages',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      model:'claude-sonnet-4-20250514',
+      max_tokens:200,
+      system:CLAUDE_SYSTEM,
+      messages:[{role:'user',content:text}]
+    })
+  });
+  const data=await res.json();
+  if(!res.ok) throw new Error(data.error?.message||'API error');
+  return data.content[0].text;
+}
 
 // ── ElevenLabs ────────────────────────────────────────────────────────────────
 function initElKey(){const s=localStorage.getItem('el_key');if(s){elKey=s;setElStatus(true);}}
@@ -406,26 +506,38 @@ function setListening(v){listening=v;const btn=document.getElementById('mic-btn'
 // ── Send ──────────────────────────────────────────────────────────────────────
 function getResponse(text){for(const s of SCRIPTS){if(s.match.test(text))return s;}return DEFAULT;}
 
-function send(text){
+async function send(text){
   if(!text.trim())return;
   hideErr();document.getElementById('qa').style.display='none';
   addMsg('user',text);showTyping();
-  // Detect and store merchant name for dispute flow
   const merchant=detectMerchant(text);
   if(merchant) disputedMerchant=merchant;
-  const resp=getResponse(text);
-  // Personalise dispute confirmation reply with merchant name
-  const reply=(resp.card==='dispute'&&disputedMerchant)
-    ?`Got it and we're on it. I've opened a dispute for the ${disputedMerchant} charge and the details are on screen. Is there anything else I can help with?`
-    :resp.reply;
-  setTimeout(()=>{
+  const scripted=getResponse(text);
+  const isDefault=scripted===DEFAULT;
+
+  try{
+    let reply, card=null, followups=[];
+    if(isDefault){
+      // Route to Claude for open-ended questions
+      reply=await askClaude(text);
+    } else {
+      reply=(scripted.card==='dispute'&&disputedMerchant)
+        ?`Got it and we're on it. I've opened a dispute for the ${disputedMerchant} charge and the details are on screen. Is there anything else I can help with?`
+        :scripted.reply;
+      card=scripted.card;
+      followups=scripted.followups||[];
+    }
     hideTyping();
     addMsg('bot',reply);
-    if(resp.card){const wrap=document.createElement('div');wrap.innerHTML=cardHTML(resp.card);document.getElementById('chat').appendChild(wrap);}
-    if(resp.followups&&resp.followups.length)showFU(resp.followups);
+    if(card){const wrap=document.createElement('div');wrap.innerHTML=cardHTML(card);document.getElementById('chat').appendChild(wrap);}
+    if(followups.length) showFU(followups);
     speak(reply);
     scroll();
-  },800+Math.random()*300);
+  } catch(e){
+    hideTyping();
+    const fb=`I'm having a little trouble right now. Please call us directly at 1-888-741-1115 — we're available 24 hours a day.`;
+    addMsg('bot',fb);speak(fb);
+  }
 }
 
 function qs(t){send(t);}
