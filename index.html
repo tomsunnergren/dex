@@ -270,7 +270,7 @@ function cardHTML(type){
     dispute:`<div class="card" style="border-left-color:#f59e0b">
       <div class="card-header">
         <div class="card-icon" style="background:#fffbeb">${IC.alert}</div>
-        <div><div class="card-title">Dispute Opened</div><div class="card-sub">Case number assigned</div></div>
+        <div><div class="card-title">Dispute Opened${disputedMerchant?` — ${disputedMerchant}`:''}</div><div class="card-sub">Case number assigned</div></div>
       </div>
       <div class="card-row">${IC.check} Dispute recorded and assigned a case number</div>
       <div class="card-row">${IC.clock} Investigation: up to 10 business days</div>
@@ -339,6 +339,19 @@ const DEFAULT={reply:`I want to make sure I get you the right help. I can assist
 let voiceOn=true,speaking=false,listening=false;
 let rec=null,micStream=null,pending='',lgText=false;
 let _chosenVoice=null,elKey='',currentAudio=null;
+let disputedMerchant='';
+
+const MERCHANT_LIST=[
+  {name:'Walgreens',re:/walgreen/i},
+  {name:'Kroger',re:/kroger/i},
+  {name:'National Grid',re:/national.?grid/i},
+  {name:'CVS Pharmacy',re:/cvs/i},
+  {name:"McDonald's",re:/mcdonald/i},
+  {name:'Rite Aid',re:/rite.?aid/i},
+  {name:'Dollar General',re:/dollar.?general/i},
+  {name:'Amazon',re:/amazon/i},
+];
+function detectMerchant(text){for(const m of MERCHANT_LIST){if(m.re.test(text))return m.name;}return '';}
 const EL_VOICE='EXAVITQu4vr4xnSDxMaL';
 
 // ── ElevenLabs ────────────────────────────────────────────────────────────────
@@ -397,13 +410,20 @@ function send(text){
   if(!text.trim())return;
   hideErr();document.getElementById('qa').style.display='none';
   addMsg('user',text);showTyping();
+  // Detect and store merchant name for dispute flow
+  const merchant=detectMerchant(text);
+  if(merchant) disputedMerchant=merchant;
   const resp=getResponse(text);
+  // Personalise dispute confirmation reply with merchant name
+  const reply=(resp.card==='dispute'&&disputedMerchant)
+    ?`Got it and we're on it. I've opened a dispute for the ${disputedMerchant} charge and the details are on screen. Is there anything else I can help with?`
+    :resp.reply;
   setTimeout(()=>{
     hideTyping();
-    addMsg('bot',resp.reply);
+    addMsg('bot',reply);
     if(resp.card){const wrap=document.createElement('div');wrap.innerHTML=cardHTML(resp.card);document.getElementById('chat').appendChild(wrap);}
     if(resp.followups&&resp.followups.length)showFU(resp.followups);
-    speak(resp.reply);
+    speak(reply);
     scroll();
   },800+Math.random()*300);
 }
