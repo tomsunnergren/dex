@@ -252,7 +252,8 @@ async function askAI(text){
     })
   });
   const d=await res.json();
-  if(!res.ok) throw new Error(d.error?.message||'Gemini error');
+  if(!res.ok) throw new Error(`Gemini ${res.status}: ${d.error?.message||'unknown error'}`);
+  if(!d.candidates?.[0]?.content?.parts?.[0]?.text) throw new Error('No response from Gemini');
   return d.candidates[0].content.parts[0].text;
 }
 
@@ -405,7 +406,7 @@ async function send(text){
     scroll();
   }catch(e){
     hideTyping();
-    const fb="I'm having a little trouble right now. Please call us at 1-888-741-1115 — we're available 24 hours a day.";
+    const fb=`I'm having a little trouble — ${e.message}. Please call us at 1-888-741-1115.`;
     addMsg('bot',fb);speak(fb);
   }
 }
